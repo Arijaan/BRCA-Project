@@ -3,8 +3,32 @@ title: "BRCA-Project"
 output: html_notebook
 ---
 
+# PROJECT 1 — TCGA-BRCA \| Breast Invasive Carcinoma
+
+## Cleaning annotations
 
 ```{r}
-#chunk 1
+library(dplyr)
 ```
 
+```{r}
+
+#-------------------------Cleaning annotations---------------------------------
+
+
+# check how many columns start with paper_
+papercol <- brca_anot_clean %>% select(starts_with("paper_"))
+dim(papercol)
+
+anot_paper <- brca_anot[, c("barcode", grep("^paper_", names(anot), value = TRUE))]
+
+```
+
+## Part 1: Gene Expression Analysis
+
+### Data structure investigation:
+
+```{r}
+
+colnames(brca_anot_clean, grep("^paper_")) ; dim(brca_exp_clean)
+```
