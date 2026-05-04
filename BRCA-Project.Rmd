@@ -8,14 +8,12 @@ output: html_notebook
 ## Cleaning annotations
 
 ```{r}
-### Core libraries 
-library(dplyr) # Data manipulation and visualization
-library(ggplot2) # Data manipulation and visualization
-library(pheatmap) #Heatmaps
-library(caret) # maschine learning
+load("~/BRCA-Project/BRCA_data.RData")
+library(dplyr) 
+library(ggplot2) 
+library(pheatmap) 
+library(caret) 
 ```
-
-afawfafaf timo timo timo
 
 ```{r}
 
@@ -54,6 +52,8 @@ subtype_counts <- table(anot_paper$paper_BRCA_Subtype_PAM50, useNA = "ifany")
 print("Sample count per PAM50 subtype:")
 print(subtype_counts)
 ```
+
+## How many samples and genes are in the expression matrix?
 
 ## significant breast cancer genes:
 
