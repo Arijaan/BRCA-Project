@@ -15,6 +15,7 @@ library(pheatmap) #Heatmaps
 library(caret) # maschine learning
 ```
 afawfafaf
+brbrbrbr - timo
 ```{r}
 
 #-------------------------Cleaning annotations---------------------------------
