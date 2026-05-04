@@ -8,27 +8,49 @@ output: html_notebook
 ## Cleaning annotations
 
 ```{r}
-library(dplyr)
+### Core libraries 
+library(dplyr) # Data manipulation and visualization
+library(ggplot2) # Data manipulation and visualization
+library(pheatmap) #Heatmaps
+library(caret) # maschine learning
 ```
 afawfafaf
 ```{r}
 
 #-------------------------Cleaning annotations---------------------------------
-
+anot_paper <- brca_anot_clean[, c("barcode", grep("^paper_", names(brca_anot_clean), value = TRUE))]
 
 # check how many columns start with paper_
-papercol <- brca_anot_clean %>% select(starts_with("paper_"))
-dim(papercol)
+num_paper_cols <- ncol(anot_paper) - 1 # Subtract 1 to exclude the 'barcode' column
+cat("Number of paper_ columns retained:", num_paper_cols, "\n")
 
-anot_paper <- brca_anot[, c("barcode", grep("^paper_", names(anot), value = TRUE))]
+## Finding the Valid Patients
+# The primary target for BRCA is paper_BRCA_Subtype_PAM50
+valid_target_samples <- sum(!is.na(anot_paper$paper_BRCA_Subtype_PAM50))
+cat("Samples with non-NA PAM50 subtype:", valid_target_samples, "\n")
 
 ```
 
 ## Part 1: Gene Expression Analysis
 
 ### Data structure investigation:
+```{r step1-data-structure}
+# --- 1. Samples and Genes in the Expression Matrix ---
+# The dim() function returns the dimensions of your dataset: [1] Number of Rows, [2] Number of Columns.
+dim(brca_exp_clean)
 
-```{r}
+num_genes <- nrow(brca_exp_clean)
+num_samples_exp <- ncol(brca_exp_clean)
+cat("Expression matrix has", num_genes, "genes and", num_samples_exp, "samples.\n")
+cat("Retained paper_ columns:", ncol(anot_paper) - 1, "\n")
+## 3. Sample Count per PAM50 Subtype
+subtype_counts <- table(anot_paper$paper_BRCA_Subtype_PAM50, useNA = "ifany")
 
-colnames(brca_anot_clean, grep("^paper_")) ; dim(brca_exp_clean)
+print("Sample count per PAM50 subtype:")
+print(subtype_counts)
 ```
+
+
+
+## significant breast cancer genes: PIK3CA, PTEN, AKT1, TP53, GATA3, CDH1, RB1, MLL3, MAP3K1, CDKN1B, TBX3, RUNX1, CBFB, AFF2, PIK3R1, PTPN22, PTPRD, NF1, SF3B1 and CCND3
+
