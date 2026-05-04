@@ -8,7 +8,7 @@ output: html_notebook
 ## Cleaning annotations
 
 ```{r}
-load("~/BRCA-Project/BRCA_data.RData")
+#load("~\BRCA-Project\BRCA_data.RData")
 library(dplyr) 
 library(ggplot2) 
 library(pheatmap) 
@@ -53,11 +53,121 @@ print("Sample count per PAM50 subtype:")
 print(subtype_counts)
 ```
 
+# Part I - Gene Expression Analysis 
+
 ## How many samples and genes are in the expression matrix?
 
 ## significant breast cancer genes:
 
 PIK3CA, PTEN, AKT1, TP53, GATA3, CDH1, RB1, MLL3, MAP3K1, CDKN1B, TBX3, RUNX1, CBFB, AFF2, PIK3R1, PTPN22, PTPRD, NF1, SF3B1 and CCND3
+
+
+## How many annotation columns are retained after cleaning to paper\_ columns?
+
+## What is the sample count per PAM50 subtype (paper_BRCA_Subtype_PAM50)?
+
+## Step 2 — Expression Distribution Analysis
+
+### Randomly select 10 genes and visualize their expression distributions across all samples.
+
+### Select the top 5 and bottom 5 most variable genes (by standard deviation); plot their distributions and compare.
+
+## Step 3 — Correlation Analysis
+
+### Compute pairwise Pearson correlations across all samples using the full gene set.
+
+### Visualize as a correlation heatmap. What structure do you observe? Are there sub- blocks?
+
+### Interpret: does the correlation structure correspond to PAM50 subtypes?
+
+## Step 4 — Hierarchical Clustering
+
+### Cluster samples using hclust.
+
+### Cut the dendrogram to obtain k clusters (choose k; justify your choice).
+
+### Compare cluster membership with PAM50 subtypes.
+
+## Step 5 —  PCA Visualization 
+
+### Run prcomp on the transposed expression matrix (samples as rows).
+
+### Plot PC1 vs. PC2 and PC1 vs. PC3, colored by PAM50 subtype and by hierarchical cluster.
+
+### Report the variance explained by the first three PCs. What distinguishes the subtypes?
+
+## Step 6 —  Differential Expression 
+
+### Use a Wilcoxon rank-sum test (one-vs-rest) to identify marker genes for each PAM50 subtype.
+
+### Apply FDR correction (BH). Report the top 20 genes per subtype by adjusted p-value and log2 fold-change.
+
+### Generate an annotated heatmap (rows = top DEGs, columns = samples, annotation bars = PAM50 subtype and pathologic stage).
+
+## Step 7 — Prediction Models
+
+### Split data 70/30 (stratified by subtype).
+
+### Binary task — tumor vs. normal: Logistic Regression, Random Forest, k-NN. Report confusion matrices and AUC-ROC.
+
+### Multiclass task — predict PAM50 subtype: Random Forest, Multinomial Logistic Regression, k-NN.
+
+### For each model, report: accuracy, F1, per-class precision/recall.
+
+## Step 8 — Method Comparison
+
+### Compare model performance systematically in a summary table.
+
+### Evaluate whether the top DEGs (Step 6) rank highly as predictive features (Step 7 feature importance). Overlap analysis with UpSet plot or Venn diagram.
+
+# Part II — Clinical Data Analysis
+
+## Step A — Annotation Cleaning
+
+### Tidy the annotation file to keep only curated, paper-level columns.
+
+### anot_clean \<- brca_anot_clean[, c("barcode", grep("\^paper\_", names(brca_anot_clean), value = TRUE))]
+
+### How many paper\_ columns are retained? What categories of information do they cover?
+
+### Are there samples with missing subtype assignments? How should these be handled?
+
+## Step B — Clinical Variable Exploration
+
+### Explore the clinical metadata as a standalone dataset before merging with expression data.
+
+### Explore paper_pathologic_stage, paper_BRCA_Pathology (IDC vs ILC), paper_age_at_initial_pathologic_diagnosis.
+
+### Tabulate paper_vital_status and compute median follow-up time.
+
+### Examine multi-omic cluster columns (paper_CNV.Clusters, paper_mRNA.Clusters, paper_Protein.Clusters) — how do they relate to PAM50?
+
+## Step C — Clinical Feature Classification
+
+### Predict a binary or multi-class clinical outcome using clinical variables only (no expression data).
+
+### Define the outcome variable and apply appropriate encoding.
+
+### Select a small set of meaningful features (age, stage, grade, subtype, etc.) and handle missing values by imputation or exclusion.
+
+### Train/test split (70/30 or 5-fold CV). Fit: Logistic Regression, Random Forest, k-NN.
+
+### Report confusion matrices, accuracy, sensitivity/specificity, and AUC-ROC for each model.
+
+### Identify the most predictive clinical features: variable importance from RF, and coefficients from Logistic Regression. Note that k-NN does not provide native feature importance.
+
+## Step D — Integrative Analysis (Expression + Clinical)
+
+### Correlate top DEGs from Part I with continuous clinical variables (e.g., age) using Spearman's rho.
+
+### Test whether top DEGs differ significantly across clinical stages.
+
+### Build a multimodal classifier: combine top expression features (from Step 7 / RF importance) with key clinical features. Does adding clinical data improve performance?
+
+### Visualize: boxplots of top expression features stratified by clinical subgroups; annotated heatmap with both molecular and clinical annotation bars.
+
+### 
+
 
 ## Step E - Discussion & Interpretation
 
@@ -78,3 +188,4 @@ subgroups?
 ### What are the limitations of the TCGA cohort for clinical prediction (sample size per
 
 stage, selection of academic-centre patients, etc.)?
+
