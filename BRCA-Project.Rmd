@@ -16,7 +16,21 @@ library(caret)
 ```
 
 # Part I - Gene Expression Analysis
+```{r}
 
+# Function to remove columns with lots of NAs (more than half of the entries).
+# Used later on in the script.
+nacol_rm <- function(df){
+  valid_colnames <- sapply(1:ncol(train_data), function(i){
+  ifelse(sum(is.na(train_data[,i])) > nrow(train_data)/2, NA, names[i] <- colnames(train_data[,i])
+    )
+   }
+  )
+valid_colnames <- na.omit(valid_colnames)
+df[,valid_colnames]
+}
+
+```
 ## How many samples and genes are in the expression matrix?
 
 ```{r}
@@ -34,6 +48,8 @@ cat("Retained paper_ columns:", ncol(anot_paper) - 1, "\n")
 
 ## significant breast cancer genes:
 
+How did we get these genes? @kareembeltagi7-droid
+
 PIK3CA, PTEN, AKT1, TP53, GATA3, CDH1, RB1, MLL3, MAP3K1, CDKN1B, TBX3, RUNX1, CBFB, AFF2, PIK3R1, PTPN22, PTPRD, NF1, SF3B1 and CCND3
 
 ## How many annotation columns are retained after cleaning to paper\_ columns?
@@ -46,7 +62,6 @@ anot_paper <- brca_anot_clean[, c("barcode", grep("^paper_", names(brca_anot_cle
 num_paper_cols <- ncol(anot_paper) - 1 # Subtract 1 to exclude the 'barcode' column
 cat("Number of paper_ columns retained:", num_paper_cols, "\n")
 ```
-
 
 ## What is the sample count per PAM50 subtype (paper_BRCA_Subtype_PAM50)?
 
@@ -107,9 +122,106 @@ cat("Samples with non-NA PAM50 subtype:", valid_target_samples, "\n")
 
 ### Split data 70/30 (stratified by subtype).
 
+```{r}
+
+# Using caret to create the test and training data
+trainIndex <- createDataPartition(brca_anot_clean$paper_BRCA_Subtype_PAM50, p = 0.7, list = FALSE)
+
+
+train_data <- brca_anot_clean[trainIndex, ]
+test_data  <- brca_anot_clean[-trainIndex, ]
+
+# Clearing out columns with lots of NAs 
+train_data <- nacol_rm(df=train_data)
+test_data <- nacol_rm(df=test_data)
+
+# alternative to the function:
+too_many_nas <- colSums(is.na(train_data)) > 500
+bad_column_names <- colnames(train_data)[too_many_nas]
+train_data_filtered <- train_data[, !too_many_nas]
+
+```
+
+
 ### Binary task — tumor vs. normal: Logistic Regression, Random Forest, k-NN. Report confusion matrices and AUC-ROC.
 
+#### Logistic regression
+
+```{r}
+# Creating the model using the glm function from the stats library.
+## TODO for @Arijaan: replace Class with SUBTYPE.
+
+model_logit <- glm(Class ~ ., data = train_data, family = "binomial")
+summary(model_logit)
+
+# Predict
+prob_logit <- predict(model_logit, test, type = "response")
+pred_logit <- ifelse(prob_logit > 0.5, "malignant", "benign")
+pred_logit <- factor(pred_logit, levels = c("malignant", "benign"))
+
+confusionMatrix(pred_logit, test_data) # enter subtype
+
+```
+
+#### K-Nearest Neighbor:
+
+```{r}
+# Normalize features (excluding Class)
+preproc <- preProcess(train_data[, -10], method = c("center", "scale"))
+train_norm <- predict(preproc, train_data[, -10])
+test_norm <- predict(preproc, test_data[, -10])
+
+# Add Subtype back
+train_norm <- train_data
+test_norm <- test_data
+```
+
 ### Multiclass task — predict PAM50 subtype: Random Forest, Multinomial Logistic Regression, k-NN.
+
+#### Random Forest:
+
+```{r}
+# Fit the random forest model
+model_rf <- randomForest(Class ~ ., data = train_data, importance = TRUE, ntree = 5000)
+
+# Feature importance plot
+varImpPlot(model_rf, main = "Feature Importance")
+
+# Predict
+pred_rf <- predict(model_rf, test_data)
+confusionMatrix(pred_rf, test_data) # enter subtype 
+
+confusionMatrix(pred_rf, test_data) # enter subtype
+```
+
+```{r}
+# Train k-NN
+set.seed(123)
+model_knn <- train(
+  Class ~ .,
+  data = train_norm,
+  method = "knn",
+  tuneGrid = expand.grid(k = 1:10),
+  trControl = trainControl(method = "cv", number = 5, classProbs = TRUE)
+)
+```
+
+```{r}
+# Predict
+knn_probs <- predict(model_knn, test_norm, type = "prob")[, "malignant"]
+pred_knn <- ifelse(knn_probs > 0.5, "malignant", "benign")
+pred_knn <- factor(pred_knn, levels = c("malignant", "benign"))
+confusionMatrix(pred_knn, test_norm$Class)
+
+```
+
+```{r}
+# Plot k selection
+ggplot(model_knn$results, aes(x = k, y = Accuracy)) +
+  geom_line(col="red3") +
+  geom_point() +
+  labs(title = "k-NN Accuracy vs. Number of Neighbors")
+```
 
 ### For each model, report: accuracy, F1, per-class precision/recall.
 
