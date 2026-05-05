@@ -22,7 +22,8 @@ library(caret)
 # Used later on in the script.
 nacol_rm <- function(df, p){
   valid_colnames <- sapply(1:ncol(train_data), function(i){
-  ifelse(sum(is.na(train_data[,i])) > round(nrow(train_data)*theta), NA, names[i] <- colnames(train_data[,i])
+  ifelse(sum(is.na(train_data[,i])) > round(nrow(train_data)*theta), NA,
+         names[i]<-colnames(train_data[,i])
     )
    }
   )
