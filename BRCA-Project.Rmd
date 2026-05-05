@@ -20,7 +20,7 @@ library(caret)
 
 # Function to remove columns with lots of NAs (more than half of the entries).
 # Used later on in the script.
-nacol_rm <- function(df, theta){
+nacol_rm <- function(df, p){
   valid_colnames <- sapply(1:ncol(train_data), function(i){
   ifelse(sum(is.na(train_data[,i])) > round(nrow(train_data)*theta), NA, names[i] <- colnames(train_data[,i])
     )
@@ -132,8 +132,8 @@ train_data <- brca_anot_clean[trainIndex, ]
 test_data  <- brca_anot_clean[-trainIndex, ]
 
 # Clearing out columns with lots of NAs 
-train_data <- nacol_rm(df=train_data)
-test_data <- nacol_rm(df=test_data)
+train_data <- nacol_rm(df=train_data, p=0.5)
+test_data <- nacol_rm(df=test_data, p=0.5)
 
 # alternative to the function:
 too_many_nas <- colSums(is.na(train_data)) > 500
