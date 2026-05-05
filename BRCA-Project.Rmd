@@ -20,9 +20,9 @@ library(caret)
 
 # Function to remove columns with lots of NAs (more than half of the entries).
 # Used later on in the script.
-nacol_rm <- function(df){
+nacol_rm <- function(df, theta){
   valid_colnames <- sapply(1:ncol(train_data), function(i){
-  ifelse(sum(is.na(train_data[,i])) > nrow(train_data)/2, NA, names[i] <- colnames(train_data[,i])
+  ifelse(sum(is.na(train_data[,i])) > round(nrow(train_data)*theta), NA, names[i] <- colnames(train_data[,i])
     )
    }
   )
@@ -36,13 +36,13 @@ df[,valid_colnames]
 ```{r}
 # The dim() function returns the dimensions of your dataset: [1] Number of Rows, [2] Number of Columns.
 col <- dim(brca_exp_clean)
-df_dims <- data.frame("Samples" = col[1], "Genes" = col[2] )
+df_dims <- data.frame("Samples" = col[1], "Genes" = col[2]) ; df_dims
 
 ## Alternative
-num_genes <- nrow(brca_exp_clean)
-num_samples_exp <- ncol(brca_exp_clean)
-cat("Expression matrix has", num_genes, "genes and", num_samples_exp, "samples.\n")
-cat("Retained paper_ columns:", ncol(anot_paper) - 1, "\n")
+#num_genes <- nrow(brca_exp_clean)
+#num_samples_exp <- ncol(brca_exp_clean)
+#cat("Expression matrix has", num_genes, "genes and", num_samples_exp, "samples.\n")
+#cat("Retained paper_ columns:", ncol(anot_paper) - 1, "\n")
 
 ```
 
