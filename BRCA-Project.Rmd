@@ -17,22 +17,6 @@ library(caret)
 
 # Part I - Gene Expression Analysis
 
-```{r}
-
-# Function to remove columns with lots of NAs (more than half of the entries).
-# Used later on in the script.
-nacol_rm <- function(df, p){
-  valid_colnames <- sapply(1:ncol(train_data), function(i){
-  ifelse(sum(is.na(train_data[,i])) > round(nrow(train_data)*theta), NA,
-         names[i]<-colnames(train_data[,i])
-    )
-   }
-  )
-valid_colnames <- na.omit(valid_colnames)
-df[,valid_colnames]
-}
-
-```
 
 ## How many samples and genes are in the expression matrix?
 
@@ -128,6 +112,29 @@ cat("Samples with non-NA PAM50 subtype:", valid_target_samples, "\n")
 
 ```{r}
 
+# Function to remove columns with lots of NAs (more than half of the entries).
+# Used later on in the script.
+nacol_rm <- function(df, p){
+  names <- c()
+  valid_colnames <- sapply(1:ncol(df), function(i){
+  ifelse(sum(is.na(df[,i])) > round(nrow(df)*p), NA,
+         names[i]<-colnames(df[,i])
+    )
+   }
+  )
+valid_colnames <- na.omit(valid_colnames)
+df[,valid_colnames]
+}
+
+# ---------alternative to the function: (delete if the function works lol)-----
+#too_many_nas <- colSums(is.na(train_data)) > 500
+#bad_column_names <- colnames(train_data)[too_many_nas]
+#train_data_filtered <- train_data[, !too_many_nas]
+
+```
+
+```{r}
+
 # Using caret to create the test and training data
 trainIndex <- createDataPartition(brca_anot_clean$paper_BRCA_Subtype_PAM50, p = 0.7, list = FALSE)
 
@@ -139,14 +146,21 @@ test_data  <- brca_anot_clean[-trainIndex, ]
 train_data <- nacol_rm(df=train_data, p=0.5)
 test_data <- nacol_rm(df=test_data, p=0.5)
 
-# alternative to the function:
-too_many_nas <- colSums(is.na(train_data)) > 500
-bad_column_names <- colnames(train_data)[too_many_nas]
-train_data_filtered <- train_data[, !too_many_nas]
 
 ```
 
 ### Binary task — tumor vs. normal: Logistic Regression, Random Forest, k-NN. Report confusion matrices and AUC-ROC.
+
+The provided dataset only has breast cancer patients and there are no healthy controls available to compare the patients to. Instead, we compare another binary variable: vital status. Here the patient can only be "Alive" or "Dead":
+
+```{r}
+
+vitals <- unique(brca_anot_clean$paper_vital_status) ; vitals() 
+
+
+
+```
+
 
 #### Logistic regression
 
@@ -154,15 +168,15 @@ train_data_filtered <- train_data[, !too_many_nas]
 # Creating the model using the glm function from the stats library.
 ## TODO for @Arijaan: replace Class with SUBTYPE.
 
-model_logit <- glm(Class ~ ., data = train_data, family = "binomial")
+model_logit <- glm(paper_vital_status ~ ., data = train_data, family = "binomial")
 summary(model_logit)
 
 # Predict
 prob_logit <- predict(model_logit, test, type = "response")
-pred_logit <- ifelse(prob_logit > 0.5, "malignant", "benign")
-pred_logit <- factor(pred_logit, levels = c("malignant", "benign"))
+pred_logit <- ifelse(prob_logit > 0.5, "alive", "dead")
+pred_logit <- factor(pred_logit, levels = c("alive", "dead"))
 
-confusionMatrix(pred_logit, test_data) # enter subtype
+confusionMatrix(pred_logit$paper_vital_status, test_data$paper_vital_status)
 
 ```
 
