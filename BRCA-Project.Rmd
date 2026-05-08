@@ -38,13 +38,9 @@ df[,valid_colnames]
 
 ```{r}
 # The dim() function returns the dimensions of your dataset: [1] Number of Rows, [2] Number of Columns.
-<<<<<<< HEAD
-col <- dim(brca_exp_clean)
-df_dims <- data.frame("Samples" = col[1], "Genes" = col[2]) ; df_dims
-=======
+
 dim <- dim(brca_exp_clean)
 df_dims <- data.frame("Samples" = dim[1], "Genes" = dim[2])
->>>>>>> 5f34086fda3745c32c3df39a8b9e6ac42bd2ead5
 
 ## Alternative
 #num_genes <- nrow(brca_exp_clean)
