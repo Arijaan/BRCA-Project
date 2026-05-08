@@ -194,6 +194,19 @@ ggplot(var_exp, aes(x = reorder(gene, Expression, FUN = median),
 ## Step 4 — Hierarchical Clustering
 
 ### Cluster samples using hclust.
+```{r}
+sample_dist <- dist(t(brca_exp_clean), method = "euclidean")
+
+# Perform hierarchical clustering
+hc <- hclust(sample_dist, method = "ward.D2")
+k <- 5
+ect.hc(hc, k = k, border = "red")
+hc_clusters <- cutree(hc, k = k)
+print(table(hc_clusters))
+
+
+```
+
 
 ### Cut the dendrogram to obtain k clusters (choose k; justify your choice).
 
