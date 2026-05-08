@@ -133,7 +133,6 @@ geom_boxplot(alpha = 0.7, outlier.size = 0.5) +
        x = "Gene",
        y = "Normalized Expression Level")
 
-# iawdhowaefewa
 
 ```
 
