@@ -13,7 +13,7 @@ library(dplyr)
 library(ggplot2) 
 library(pheatmap) 
 library(caret)
-library (tibble)
+library(tibble)
 library(tidyr)
 ```
 
@@ -170,9 +170,35 @@ ggplot(var_exp, aes(x = reorder(gene, Expression, FUN = median),
 
 ### Compute pairwise Pearson correlations across all samples using the full gene set.
 
+```{r}
+
+gene_data <- data[, gene_columns] 
+
+# 2. Transpose the matrix (patients become columns, genes become rows)
+transposed_genes <- t(gene_data)
+
+# 3. Compute the 1099 x 1099 patient-to-patient correlation matrix
+patient_cor_matrix <- cor(transposed_genes, method = "pearson")
+
+
+corrs <- cor(brca_exp_clean[,-1],method="pearson")
+```
+
+
 ### Visualize as a correlation heatmap. What structure do you observe? Are there sub- blocks?
 
 ### Interpret: does the correlation structure correspond to PAM50 subtypes?
+
+```{r}
+
+pheatmap(corrs, cluster_rows = FALSE,
+  cluster_cols = FALSE, show_rownames = F,
+  show_colnames = F)
+
+# Jungs ich weiß nicht ob das hier richtig ist, aber so siehts gerade mit dem heatmap aus: -@Arijaan
+
+```
+
 
 ## Step 4 — Hierarchical Clustering
 
@@ -207,6 +233,11 @@ ggplot(var_exp, aes(x = reorder(gene, Expression, FUN = median),
 ## Step 6 — Differential Expression
 
 ### Use a Wilcoxon rank-sum test (one-vs-rest) to identify marker genes for each PAM50 subtype.
+
+```{r}
+wilcox.test()
+```
+
 
 ### Apply FDR correction (BH). Report the top 20 genes per subtype by adjusted p-value and log2 fold-change.
 
