@@ -17,8 +17,9 @@ library (tibble)
 library(tidyr)
 ```
 
-# Part I - Gene Expression Analysis
+=======
 
+# Part I - Gene Expression Analysis 
 
 ## How many samples and genes are in the expression matrix?
 
@@ -26,9 +27,10 @@ library(tidyr)
 # The dim() function returns the dimensions of your dataset: [1] Number of Rows, [2] Number of Columns.
 
 dim <- dim(brca_exp_clean)
-df_dims <- data.frame("Samples" = dim[1], "Genes" = dim[2])
+df_dims <- data.frame("Genes" = dim[1], "Samples" = dim[2]) ; df_dims
 
 ## Alternative
+
 #num_genes <- nrow(brca_exp_clean)
 #num_samples_exp <- ncol(brca_exp_clean)
 #cat("Expression matrix has", num_genes, "genes and", num_samples_exp, "samples.\n")
@@ -36,21 +38,19 @@ df_dims <- data.frame("Samples" = dim[1], "Genes" = dim[2])
 
 ```
 
-## significant breast cancer genes:
-
-How did we get these genes? @kareembeltagi7-droid
-
-PIK3CA, PTEN, AKT1, TP53, GATA3, CDH1, RB1, MLL3, MAP3K1, CDKN1B, TBX3, RUNX1, CBFB, AFF2, PIK3R1, PTPN22, PTPRD, NF1, SF3B1 and CCND3
-
-## How many annotation columns are retained after cleaning to paper\_ columns?
-
 ```{r}
+# --- 1. Samples and Genes in the Expression Matrix ---
+
 # indexes the annotations for the columns starting with paper, adding a barcode column for counting.
 anot_paper <- brca_anot_clean[, c("barcode", grep("^paper_", names(brca_anot_clean), value = TRUE))]
 
 # check how many columns start with paper_
 num_paper_cols <- ncol(anot_paper) - 1 # Subtract 1 to exclude the 'barcode' column
 cat("Number of paper_ columns retained:", num_paper_cols, "\n")
+
+dim <- dim(brca_anot_clean)
+df_dims <- data.frame("Samples" = dim[1], "annotations" = dim[2]) ; df_dims
+
 ```
 
 ## What is the sample count per PAM50 subtype (paper_BRCA_Subtype_PAM50)?
@@ -62,31 +62,20 @@ subtype_counts <- table(anot_paper$paper_BRCA_Subtype_PAM50, useNA = "ifany")
 
 print("Sample count per PAM50 subtype:")
 print(subtype_counts)
+```
 
+```{r}
 ## Finding the Valid Patients
 # The primary target for BRCA is paper_BRCA_Subtype_PAM50
 valid_target_samples <- sum(!is.na(anot_paper$paper_BRCA_Subtype_PAM50))
 cat("Samples with non-NA PAM50 subtype:", valid_target_samples, "\n")
 
+# Alternative
+data.frame("Valid_PAM50_subtypes" = valid_target_samples, "NA" = length(anot_paper$paper_BRCA_Subtype_PAM50)-valid_target_samples)
+
 ```
 
-=======
-
-# Part I - Gene Expression Analysis 
-
-## How many samples and genes are in the expression matrix?
-
-```{r}
-# --- 1. Samples and Genes in the Expression Matrix ---
-dim(brca_exp_clean)
-num_genes <- nrow(brca_exp_clean)
-num_samples_exp <- ncol(brca_exp_clean)
-cat("Expression matrix has", num_genes, "genes and", num_samples_exp, "samples.\n")
-cat("Retained paper_ columns:", ncol(anot_paper) - 1, "\n")
-```
-
-
-## significant breast cancer genes:
+## significant breast cancer genes from the paper:
 
 PIK3CA, PTEN, AKT1, TP53, GATA3, CDH1, RB1, MLL3, MAP3K1, CDKN1B, TBX3, RUNX1, CBFB, AFF2, PIK3R1, PTPN22, PTPRD, NF1, SF3B1 and CCND3
 
@@ -94,23 +83,16 @@ PIK3CA, PTEN, AKT1, TP53, GATA3, CDH1, RB1, MLL3, MAP3K1, CDKN1B, TBX3, RUNX1, C
 ## How many annotation columns are retained after cleaning to paper\_ columns?
 
 ```{r}
+
+#---------------------Not Needed-------------------
+
+
 # check how many columns start with paper_
 num_paper_cols <- ncol(anot_paper) - 1 # Subtract 1 to exclude the 'barcode' column
 cat("Number of paper_ columns retained:", num_paper_cols, "\n")
 ```
 
 
-## What is the sample count per PAM50 subtype (paper_BRCA_Subtype_PAM50)?
-
-```{r}
-## Sample Count per PAM50 Subtype
-
-subtype_counts <- table(anot_paper$paper_BRCA_Subtype_PAM50, useNA = "ifany")
-
-print("Sample count per PAM50 subtype:")
-print(subtype_counts)
-```
- 
 ## Step 2 — Expression Distribution Analysis
 
 ### Randomly select 10 genes and visualize their expression distributions across all samples.
@@ -138,6 +120,7 @@ geom_boxplot(alpha = 0.7, outlier.size = 0.5) +
 
 
 ### Select the top 5 and bottom 5 most variable genes (by standard deviation); plot their distributions and compare.
+
 ```{r}
 # Calculate gene variability (standard deviation)
 # Calculate standard deviation for each gene (across all samples)
@@ -195,14 +178,15 @@ ggplot(var_exp, aes(x = reorder(gene, Expression, FUN = median),
 
 ### Cluster samples using hclust.
 ```{r}
-sample_dist <- dist(t(brca_exp_clean), method = "euclidean")
+#sample_dist <- dist(t(brca_exp_clean), method = "euclidean")
 
-# Perform hierarchical clustering
-hc <- hclust(sample_dist, method = "ward.D2")
-k <- 5
-ect.hc(hc, k = k, border = "red")
-hc_clusters <- cutree(hc, k = k)
-print(table(hc_clusters))
+#Perform hierarchical clustering
+
+#hc <- hclust(sample_dist, method = "ward.D2")
+#k <- 5
+#ect.hc(hc, k = k, border = "red")
+#hc_clusters <- cutree(hc, k = k)
+#print(table(hc_clusters))
 
 
 ```
@@ -236,103 +220,145 @@ print(table(hc_clusters))
 
 # Function to remove columns with lots of NAs (more than half of the entries).
 # Used later on in the script.
-nacol_rm <- function(df, p){
-  names <- c()
-  valid_colnames <- sapply(1:ncol(df), function(i){
-  ifelse(sum(is.na(df[,i])) > round(nrow(df)*p), NA,
-         names[i]<-colnames(df[,i])
-    )
-   }
-  )
-valid_colnames <- na.omit(valid_colnames)
-df[,valid_colnames]
-}
+#nacol_rm <- function(df, p){
+#  names <- c()
+#  valid_colnames <- sapply(1:ncol(df), function(i){
+#  ifelse(sum(is.na(df[,i])) > round(nrow(df)*p), NA,
+#         names[i]<-colnames(df[,i])
+#    )
+#   }
+#  )
 
-# ---------alternative to the function: (delete if the function works lol)-----
-#too_many_nas <- colSums(is.na(train_data)) > 500
-#bad_column_names <- colnames(train_data)[too_many_nas]
-#train_data_filtered <- train_data[, !too_many_nas]
+#valid_colnames <- na.omit(valid_colnames)
+#df[,valid_colnames]
+#}
+
+# ---------alternative to the function: (delete if the function works ---LOL
+
+nacol_rm <- function(df,p){
+too_many_nas <- colSums(is.na(df)) > round(nrow(df)*p)
+bad_column_names <- colnames(df)[too_many_nas]
+df <- df[, !too_many_nas]
+}
+```
+
+For binary analysis of the data, we need to annotate the subtypes properly, so that we have either a "normal" or a "tumor". For this, we can use `dplyr`:
+
+```{r}
+
+# Coverstion of subtypes into binary:
+normal <- brca_anot_clean %>% filter(paper_BRCA_Subtype_PAM50 == "Normal") 
+tumor <- brca_anot_clean %>% filter(!paper_BRCA_Subtype_PAM50 == "Normal") 
+tumor$paper_BRCA_Subtype_PAM50 <- "tumor"
+binary_data <- rbind(normal,tumor)
+
+# Rownames to cols
+ 
+binary_data <- binary_data %>% 
+  column_to_rownames("barcode")
+
+binary_data[numeric_cols]
+# Convert to numeric
+#numeric_cols <- setdiff(names(binary_data), "paper_BRCA_Subtype_PAM5")
+
+#binary_data[numeric_cols] <- lapply(binary_data[,numeric_cols], function(x) as.numeric(as.character(x)))
+
+
+## AI version:
+
+binary_data <- binary_data %>%
+  # Convert everything EXCEPT the target column to numeric
+  mutate(across(-paper_BRCA_Subtype_PAM50, ~ as.numeric(as.character(.))))
 
 ```
+
 
 ```{r}
 
 # Using caret to create the test and training data
-trainIndex <- createDataPartition(brca_anot_clean$paper_BRCA_Subtype_PAM50, p = 0.7, list = FALSE)
+trainIndex <- createDataPartition(binary_data$paper_BRCA_Subtype_PAM50, p = 0.7, list = FALSE)
 
 
-train_data <- brca_anot_clean[trainIndex, ]
-test_data  <- brca_anot_clean[-trainIndex, ]
+train_data <- binary_data[trainIndex, ]
+test_data  <- binary_data[-trainIndex, ]
 
 # Clearing out columns with lots of NAs 
-train_data <- nacol_rm(df=train_data, p=0.5)
+train_data <- nacol_rm(df=train_data, p=0.5) # proportion of cols with NAs
 test_data <- nacol_rm(df=test_data, p=0.5)
 
+```
 
+
+```{r}
+
+##################### Gemini glm #############################
+
+# 1. Conversion of subtypes into binary
+normal <- brca_anot_clean %>% filter(paper_BRCA_Subtype_PAM50 == "Normal") 
+tumor <- brca_anot_clean %>% filter(paper_BRCA_Subtype_PAM50 != "Normal") # Safer than !col == "Normal"
+tumor$paper_BRCA_Subtype_PAM50 <- "tumor"
+binary_data <- rbind(normal, tumor)
+
+# 2. Rownames to cols
+binary_data <- binary_data %>% 
+  column_to_rownames("barcode")
+
+# 3. Handle NAs and Factors safely at the dataframe level
+binary_data <- binary_data %>% 
+  filter(!is.na(paper_BRCA_Subtype_PAM50)) %>% 
+  mutate(paper_BRCA_Subtype_PAM50 = factor(paper_BRCA_Subtype_PAM50, levels = c("Normal", "tumor")))
+
+# 4. Get numeric columns (Typo fixed)
+numeric_cols <- setdiff(names(binary_data), "paper_BRCA_Subtype_PAM50")
+
+# (Optional: Convert to numeric if you uncommented your lapply)
+# binary_data[numeric_cols] <- lapply(binary_data[numeric_cols], function(x) as.numeric(as.character(x)))
+
+# 5. Split Data
+set.seed(123) # Always set a seed for reproducibility
+trainIndex <- createDataPartition(binary_data$paper_BRCA_Subtype_PAM50, p = 0.7, list = FALSE)
+
+train_data <- binary_data[trainIndex, ]
+test_data  <- binary_data[-trainIndex, ]
+
+# 6. Correct NA handling (Preventing Data Leakage)
+# Calculate which columns to drop based ONLY on training data
+too_many_nas <- colSums(is.na(train_data)) > round(nrow(train_data) * 0.5)
+cols_to_drop <- colnames(train_data)[too_many_nas]
+
+# Drop the exact same columns from BOTH datasets
+train_data <- train_data[, !colnames(train_data) %in% cols_to_drop]
+test_data  <- test_data[, !colnames(test_data) %in% cols_to_drop]
+
+# 7. Model
+model_logit <- glm(paper_BRCA_Subtype_PAM50 ~ ., data = train_data, family = "binomial")
+
+summary(model_logit)
 ```
 
 ### Binary task — tumor vs. normal: Logistic Regression, Random Forest, k-NN. Report confusion matrices and AUC-ROC.
 
-The provided dataset only has breast cancer patients and there are no healthy controls available to compare the patients to. Instead, we compare another binary variable: vital status. Here the patient can only be "Alive" or "Dead":
-
-```{r}
-
-vitals <- unique(brca_anot_clean$paper_vital_status) ; vitals() 
-
-
-
-```
-
-
 #### Logistic regression
 
-```{r}
-# Creating the model using the glm function from the stats library.
-## TODO for @Arijaan: replace Class with SUBTYPE.
+```{r Logistic regression}
 
-model_logit <- glm(paper_vital_status ~ ., data = train_data, family = "binomial")
+# Creating the model using the glm function from the stats library.
+
+# NAs can be inputted here since the function takes out all NAs. 
+model_logit <- glm(paper_BRCA_Subtype_PAM50 ~ ., data = train_data, family = "binomial")
+
 summary(model_logit)
 
 # Predict
 prob_logit <- predict(model_logit, test, type = "response")
-pred_logit <- ifelse(prob_logit > 0.5, "alive", "dead")
-pred_logit <- factor(pred_logit, levels = c("alive", "dead"))
+pred_logit <- ifelse(prob_logit > 0.5, "normal", "tumor")
+pred_logit <- factor(pred_logit, levels = c("normal", "tumor"))
 
 confusionMatrix(pred_logit$paper_vital_status, test_data$paper_vital_status)
 
 ```
 
 #### K-Nearest Neighbor:
-
-```{r}
-# Normalize features (excluding Class)
-preproc <- preProcess(train_data[, -10], method = c("center", "scale"))
-train_norm <- predict(preproc, train_data[, -10])
-test_norm <- predict(preproc, test_data[, -10])
-
-# Add Subtype back
-train_norm <- train_data
-test_norm <- test_data
-```
-
-### Multiclass task — predict PAM50 subtype: Random Forest, Multinomial Logistic Regression, k-NN.
-
-#### Random Forest:
-
-```{r}
-# Fit the random forest model
-model_rf <- randomForest(Class ~ ., data = train_data, importance = TRUE, ntree = 5000)
-
-# Feature importance plot
-varImpPlot(model_rf, main = "Feature Importance")
-
-# Predict
-pred_rf <- predict(model_rf, test_data)
-confusionMatrix(pred_rf, test_data) # enter subtype 
-
-confusionMatrix(pred_rf, test_data) # enter subtype
-```
-
 ```{r}
 # Train k-NN
 set.seed(123)
@@ -353,6 +379,17 @@ pred_knn <- factor(pred_knn, levels = c("malignant", "benign"))
 confusionMatrix(pred_knn, test_norm$Class)
 
 ```
+```{r}
+# Normalize features (excluding Class)
+preproc <- preProcess(train_data[, -10], method = c("center", "scale"))
+train_norm <- predict(preproc, train_data[, -10])
+test_norm <- predict(preproc, test_data[, -10])
+
+# Add Subtype back
+train_norm <- train_data
+test_norm <- test_data
+```
+
 
 ```{r}
 # Plot k selection
@@ -360,6 +397,52 @@ ggplot(model_knn$results, aes(x = k, y = Accuracy)) +
   geom_line(col="red3") +
   geom_point() +
   labs(title = "k-NN Accuracy vs. Number of Neighbors")
+```
+
+#### Random forest
+
+
+-----------------------------------------------------------------
+
+
+
+### Multiclass task — predict PAM50 subtype: Random Forest, Multinomial Logistic Regression, k-NN.
+
+#### Random Forest:
+
+```{r}
+library(randomForest)
+# appending meaningfull expression data of the top 100 genes to the annotations dataset for increasing accuarcy.
+
+sig_genes <- head(gene_variability, 100)
+sig_genes <- column_to_rownames(sig_genes, "gene")
+dat <- brca_anot_clean %>% 
+  column_to_rownames("barcode") %>% 
+  filter(!is.na(paper_BRCA_Subtype_PAM50)) %>% 
+  mutate(exp = t(sig_genes))
+# Fit the random forest model
+# Using caret to create the test and training data
+
+trainIndex <- createDataPartition(dat$paper_BRCA_Subtype_PAM50, p = 0.7, list = FALSE)
+
+
+train_data <- binary_data[trainIndex, ]
+test_data  <- binary_data[-trainIndex, ]
+
+# Clearing out columns with lots of NAs 
+train_data <- nacol_rm(df=train_data, p=0.5) # proportion of cols with NAs
+test_data <- nacol_rm(df=test_data, p=0.5)
+
+model_rf <- randomForest(paper_BRCA_Subtype_PAM50 ~ ., data = train_data, importance = TRUE, ntree = 500)
+
+# Feature importance plot
+varImpPlot(model_rf, main = "Feature Importance")
+
+# Predict
+pred_rf <- predict(model_rf, test_data)
+confusionMatrix(pred_rf, test_data$paper_br) # enter subtype 
+
+confusionMatrix(pred_rf, test_data) # enter subtype
 ```
 
 ### For each model, report: accuracy, F1, per-class precision/recall.
