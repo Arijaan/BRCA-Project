@@ -15,6 +15,7 @@ library(pheatmap)
 library(caret)
 library(tibble)
 library(tidyr)
+library(cluster)
 ```
 
 =======
@@ -202,8 +203,8 @@ pheatmap(corrs, cluster_rows = FALSE,
 
 ## Step 4 — Hierarchical Clustering
 
-### Cluster samples using hclust.
 ```{r}
+<<<<<<< HEAD
 #sample_dist <- dist(t(brca_exp_clean), method = "euclidean")
 
 #Perform hierarchical clustering
@@ -213,12 +214,79 @@ pheatmap(corrs, cluster_rows = FALSE,
 #ect.hc(hc, k = k, border = "red")
 #hc_clusters <- cutree(hc, k = k)
 #print(table(hc_clusters))
+=======
+# Check the dimensions
+dim(exp_t)
+
+# Check for NAs
+sum(is.na(exp_t))
+
+# Check for infinite values
+sum(is.infinite(exp_t))
+
+# Check data types of each column
+str(exp_t[, 1:5])  # look at first 5 columns
+
+# Check if any columns are non-numeric
+any(!apply(exp_t, 2, is.numeric))
+
+```
+```{r}
+# If brca_exp_clean is a data frame with a gene name column
+brca_exp_clean_fixed <- brca_exp_clean %>%
+  column_to_rownames("gene") %>%   # move gene names to rownames
+  mutate(across(everything(), as.numeric))  # ensure all values are numeric
+
+# Verify
+str(brca_exp_clean_fixed[1:3, 1:3])  # should say num
+dim(brca_exp_clean_fixed)            # should be 1099 x 2994 (one less row now)
+
+# Now safely proceed
+
+```
+
+
+### Cluster samples using hclust.
+```{r step4-hierarchical-clustering, fig.width=10, fig.height=6}
+
+# chunk 2 - evaluate k and cut dendrogram
+library(cluster)
+
+exp_t <- t(brca_exp_clean_fixed)
+D <- dist(exp_t, method = "euclidean")
+hc <- hclust(D, method = "ward.D2")
+
+# evaluate k using silhouette
+km <- kmeans(x = exp_t, centers = 3, nstart = 10)
+s <- silhouette(km$cluster, D)
+plot(s, col = 'blue')
+>>>>>>> 6b4c5be (part 4 continuation)
 
 
 ```
 
 
 ### Cut the dendrogram to obtain k clusters (choose k; justify your choice).
+
+```{r}
+# cut the dendrogram
+k_chosen <- 3
+hc_clusters <- cutree(hc, k = k_chosen)
+
+# visualize
+plot(hc,
+     labels = FALSE,
+     main = "Hierarchical clustering of BRCA samples",
+     xlab = "Samples",
+     ylab = "Height")
+
+# add rectangles showing the k clusters on the dendrogram
+rect.hclust(hc, k = k_chosen, border = "red")
+
+# check cluster sizes
+table(hc_clusters)
+```
+
 
 ### Compare cluster membership with PAM50 subtypes.
 
