@@ -180,11 +180,99 @@ ggplot(var_exp, aes(x = reorder(gene, Expression, FUN = median),
 
 
 ## Step 3 — Correlation Analysis
+## Prerequisite — Sample Alignment
 
-### Compute pairwise Pearson correlations across all samples using the full gene set.
+Before running any analysis that combines the expression matrix with the annotation file, we must ensure that both objects contain **exactly the same samples in the same order**. Mismatches would silently corrupt all downstream results.
+```{r}
+#First set the column "gene" as rownames 
+brca_exp_clean_ctr <- brca_exp_clean %>%
+  column_to_rownames("gene")
+```
+
+```{r} 
+# TRUE = Reihenfolge stimmt bereits überein, kein Alignment nötig
+all(colnames(brca_exp_clean_ctr) == anot_paper$barcode)
+``` 
+Because the the result says "TRUE" we don't need to correct the alginment. The order and dimensions are aligned. Else we would have to write the following aligmentprompt: 
 
 ```{r}
+#Find samples that appear in BOTH the expression matrix "brca_exp_clean" AND the significant annotation file "anot_paper"
+common_samples <- intersect(colnames(brca_exp_clean_ctr), anot_paper$barcode)
 
+#Subset both objects to the shared samples (same order in both)
+expr_clean <- brca_exp_clean_ctr[ , common_samples]
+anot_clean <- anot_paper[match(common_samples, anot_paper$barcode), ]
+```
+
+```{r}
+#testing if samples have been removed by comparing dimensions before and after 
+# before
+dim(brca_exp_clean_ctr)
+dim(anot_paper)
+
+# after 
+dim(expr_clean)
+dim(anot_clean)
+
+#this again demonstrates that the last step was unnecessary
+```
+
+### Compute pairwise Pearson correlations across all samples using the full gene set.
+We compute **pairwise Pearson correlations** between all samples using the full gene set. The resulting n×n correlation matrix is visualised as a heatmap. Samples are annotated by PAM50 subtype so we can judge whether the correlation structure reflects known biology.
+
+The Pearson correlation measures linear co-expression: two samples with similar expression profiles across all genes will have a correlation close to 1. If PAM50 subtypes are transcriptionally distinct, we expect to see high within-subtype correlations forming visible blocks along the diagonal.
+
+```{r}
+#calculate Pearson-correlation matrix between all samples. 
+#convert to numeric matrix (required by c())
+expr_mat <- as.matrix(brca_exp_clean_ctr)
+
+#cor() applied column-wise computes correlation betweent samples. Each column = one sample's expression profile across all genes
+cor_mat <- cor(expr_mat, method = "pearson")
+```
+
+```{r}
+#unwichtig -> gibt mir die dimensions der correlation matrix was logischerweise 1099x1099 ist da das die sample zahl ist
+# gibt auch die value range
+cat("Correlation matrix dimensions:", dim(cor_mat)[1], "x", dim(cor_mat)[2], "\n")
+cat("Value range: [", round(min(cor_mat), 3), ",", round(max(cor_mat), 3), "]\n")
+```
+### Visualize as a correlation heatmap. What structure do you observe? Are there sub- blocks?
+```{r}
+#colors for PAM50-Subtpyes
+pam50_colors <- c(
+  Basal = "red",
+  Her2 = "orange",
+  LumA = "blue",
+  LumB = "green",
+  Normal = "purple"
+)
+
+# annotation for heatmap
+sample_annotation <- data.frame(
+  PAM50 = anot_clean$paper_BRCA_Subtype_PAM50,
+  row.names = anot_clean$barcode
+  )
+
+# plot heatmap
+pheatmap(
+  cor_mat,
+  annotation_col = sample_annotation,
+  annotation_row = sample_annotation,
+  annotation_colors = list(PAM50 = pam50_colors),
+  show_rownames = FALSE,
+  show_colnames = FALSE,
+  color = colorRampPalette(c("white","orange","darkred"))(100),
+  main = "Pairwise Pearson Correlation",
+  treeheight_row = 30,
+  treeheight_col = 30
+)
+```
+
+
+
+```{r}
+# Arijaan block
 gene_data <- data[, gene_columns] 
 
 # 2. Transpose the matrix (patients become columns, genes become rows)
@@ -197,8 +285,6 @@ patient_cor_matrix <- cor(transposed_genes, method = "pearson")
 corrs <- cor(brca_exp_clean[,-1],method="pearson")
 ```
 
-
-### Visualize as a correlation heatmap. What structure do you observe? Are there sub- blocks?
 
 ### Interpret: does the correlation structure correspond to PAM50 subtypes?
 
