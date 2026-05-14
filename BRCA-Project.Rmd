@@ -3,8 +3,22 @@ title: "BRCA-Project"
 output: html_notebook
 ---
 
+
 # PROJECT 1 — TCGA-BRCA \| Breast Invasive Carcinoma
 
+This project analyses RNA-seq gene expression data from The Cancer Genome Atlas
+(TCGA) BRCA cohort. The goal is to predict PAM50 molecular subtypes and
+integrate clinical metadata for biological interpretation.
+
+**Reference:** The Cancer Genome Atlas Network (2012). Comprehensive molecular
+portraits of human breast tumours. *Nature*, 490, 61–70.
+
+---
+
+## Setup — Load Libraries & Data
+
+We load all required packages and the BRCA dataset provided
+as an `.RData` file.
 ## Cleaning annotations
 
 ```{r}
@@ -21,24 +35,19 @@ library(cluster)
 =======
 
 # Part I - Gene Expression Analysis 
-
-## How many samples and genes are in the expression matrix?
+## Step 1 — Data Structure Investigation
+### How many samples and genes are in the expression matrix?
 
 ```{r}
-# The dim() function returns the dimensions of your dataset: [1] Number of Rows, [2] Number of Columns.
+# The dim() function returns the dimensions of your dataset: [1] Number of Rows (Genes), [2] Number of Columns. (Samples)
 
 dim <- dim(brca_exp_clean)
 df_dims <- data.frame("Genes" = dim[1], "Samples" = dim[2]) ; df_dims
-
-## Alternative
-
-#num_genes <- nrow(brca_exp_clean)
-#num_samples_exp <- ncol(brca_exp_clean)
-#cat("Expression matrix has", num_genes, "genes and", num_samples_exp, "samples.\n")
-#cat("Retained paper_ columns:", ncol(anot_paper) - 1, "\n")
-
 ```
-
+### How many annotation columns are retained after cleaning to paper_ columns?
+We keep only the curated publication-level columns (those starting with
+`paper_`) plus the `barcode` identifier. This filters out internal TCGA
+processing columns that are not relevant for our analysis.
 ```{r}
 # --- 1. Samples and Genes in the Expression Matrix ---
 
@@ -54,7 +63,10 @@ df_dims <- data.frame("Samples" = dim[1], "annotations" = dim[2]) ; df_dims
 
 ```
 
-## What is the sample count per PAM50 subtype (paper_BRCA_Subtype_PAM50)?
+### What is the sample count per PAM50 subtype (paper_BRCA_Subtype_PAM50)?
+
+papter_BRCA-Subtype_PAM50 is our primary target variable. The PAM50 classifier assigns each tumour to one of five intrinsic subtypes: Basal, Her2, LumA, LumB, and Normal-like.
+
 
 ```{r}
 # Shows all PAM50 subtypes in a table. The "ifany" argument adds a column with the NA count if there are any NAs available.
