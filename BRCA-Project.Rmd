@@ -691,14 +691,40 @@ confusionMatrix(pred_rf, test_data) # enter subtype
 ### anot_clean \<- brca_anot_clean[, c("barcode", grep("\^paper\_", names(brca_anot_clean), value = TRUE))]
 
 ### How many paper\_ columns are retained? What categories of information do they cover?
+```{r}
+# Count the number of paper_ columns
+num_paper_cols <- ncol(anot_paper) - 1
+print(num_paper_cols)
+
+# View the column names to see the categories
+colnames(anot_paper)
+```
 
 ### Are there samples with missing subtype assignments? How should these be handled?
+```{r}
+# Check for missing values in the subtype column
+table(anot_paper$paper_BRCA_Subtype_PAM50, useNA = "ifany")
+
+# Or count NAs directly
+sum(is.na(anot_paper$paper_BRCA_Subtype_PAM50))
+```
+
 
 ## Step B — Clinical Variable Exploration
 
 ### Explore the clinical metadata as a standalone dataset before merging with expression data.
 
 ### Explore paper_pathologic_stage, paper_BRCA_Pathology (IDC vs ILC), paper_age_at_initial_pathologic_diagnosis.
+
+```{r}
+## Patholgical Stage
+plot_stage <- anot_paper %>%
+  drop_na(paper_pathologic_stage) %>%
+  ggplot(aes(x = paper_pathological_stage)) +
+  geom_bar(fill = "red", alpha = 0.7) +
+  labs(title = "Pathologic Stage", x = "Stage", y = "Count") 
+```
+
 
 ### Tabulate paper_vital_status and compute median follow-up time.
 
