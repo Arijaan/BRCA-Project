@@ -300,102 +300,134 @@ pheatmap(corrs, cluster_rows = FALSE,
 
 
 ## Step 4 — Hierarchical Clustering
-
-```{r}
-<<<<<<< HEAD
-#sample_dist <- dist(t(brca_exp_clean), method = "euclidean")
-
-#Perform hierarchical clustering
-
-#hc <- hclust(sample_dist, method = "ward.D2")
-#k <- 5
-#ect.hc(hc, k = k, border = "red")
-#hc_clusters <- cutree(hc, k = k)
-#print(table(hc_clusters))
-=======
-# Check the dimensions
-dim(exp_t)
-
-# Check for NAs
-sum(is.na(exp_t))
-
-# Check for infinite values
-sum(is.infinite(exp_t))
-
-# Check data types of each column
-str(exp_t[, 1:5])  # look at first 5 columns
-
-# Check if any columns are non-numeric
-any(!apply(exp_t, 2, is.numeric))
-
-```
-```{r}
-# If brca_exp_clean is a data frame with a gene name column
-brca_exp_clean_fixed <- brca_exp_clean %>%
-  column_to_rownames("gene") %>%   # move gene names to rownames
-  mutate(across(everything(), as.numeric))  # ensure all values are numeric
-
-# Verify
-str(brca_exp_clean_fixed[1:3, 1:3])  # should say num
-dim(brca_exp_clean_fixed)            # should be 1099 x 2994 (one less row now)
-
-# Now safely proceed
-
-```
-
-
 ### Cluster samples using hclust.
-```{r step4-hierarchical-clustering, fig.width=10, fig.height=6}
 
-# chunk 2 - evaluate k and cut dendrogram
+```{r step4-clustering-and-silhouette, fig.width=10, fig.height=6}
+
+# Load required libraries
 library(cluster)
+library(ggplot2)
+library(tibble) # Required for column_to_rownames
+library(dplyr)
 
-exp_t <- t(brca_exp_clean_fixed)
-D <- dist(exp_t, method = "euclidean")
-hc <- hclust(D, method = "ward.D2")
+# 1. DATA PREPARATION & DISTANCE CALCULATION
+# Move gene names to rownames so the matrix is purely numeric
+brca_exp_numeric <- brca_exp_clean %>%
+  column_to_rownames("gene")  
 
-# evaluate k using silhouette
-km <- kmeans(x = exp_t, centers = 3, nstart = 10)
+# Transpose matrix so patients are rows, then calculate Euclidean distance
+exp_t <- t(brca_exp_numeric)
+D <- dist(exp_t)
+
+# 2. HIERARCHICAL CLUSTERING
+# FIX: Use 'D' instead of 'sample_dist'
+hc_result <- hclust(D, method = "ward.D2")
+
+# 3. SILHOUETTE ANALYSIS (Mathematical k)
+# We let this print directly to the Rmarkdown document instead of hiding it in a PDF
+km <- kmeans(x = exp_t, centers = 5, nstart = 10)
 s <- silhouette(km$cluster, D)
-plot(s, col = 'blue')
->>>>>>> 6b4c5be (part 4 continuation)
 
-
+cat("Average silhouette for k=5:", mean(s[, 3]), "\n")
+plot(s, col = "blue", border = NA, main = "Silhouette Plot for K-means (k=5)")
 ```
 
-
-### Cut the dendrogram to obtain k clusters (choose k; justify your choice).
+## Cut the dendrogram to obtain k clusters (choose k; justify your choice).
 
 ```{r}
-# cut the dendrogram
-k_chosen <- 3
-hc_clusters <- cutree(hc, k = k_chosen)
+# Cut the tree at k = 2 and k = 5
+hc_clusters <- cutree(hc_result, k = 2)
+hc_clusters_5 <- cutree(hc_result, k = 5) 
 
-# visualize
-plot(hc,
+plot(hc_result,
      labels = FALSE,
      main = "Hierarchical clustering of BRCA samples",
      xlab = "Samples",
      ylab = "Height")
+rect.hclust(hc_result, k = 2, border = "red")
 
-# add rectangles showing the k clusters on the dendrogram
-rect.hclust(hc, k = k_chosen, border = "red")
-
-# check cluster sizes
+# check cluster sizes for k=2
 table(hc_clusters)
 ```
 
-
 ### Compare cluster membership with PAM50 subtypes.
+
+```{r}
+# --- Comparison for k = 2 ---
+cluster_df <- data.frame(barcode = names(hc_clusters), 
+                         hc_cluster = hc_clusters)
+
+comparison_df <- merge(cluster_df, anot_paper, by = "barcode")
+
+comparison_table <- table(Cluster = comparison_df$hc_cluster, 
+                          PAM50 = comparison_df$paper_BRCA_Subtype_PAM50)
+
+
+# --- Comparison for k = 5 ---
+cluster_df_5 <- data.frame(barcode = names(hc_clusters_5), 
+                           hc_cluster = hc_clusters_5)
+
+comparison_df_5 <- merge(cluster_df_5, anot_paper, by = "barcode")
+comparison_table_5 <- table(Cluster = comparison_df_5$hc_cluster, 
+                            PAM50 = comparison_df_5$paper_BRCA_Subtype_PAM50)
+
+print("Cluster Membership vs. PAM50 Subtypes (k=2):")
+print(comparison_table)
+
+print("Cluster Membership vs. PAM50 Subtypes (k=5):")
+print(comparison_table_5)
+```
+
 
 ## Step 5 — PCA Visualization
 
 ### Run prcomp on the transposed expression matrix (samples as rows).
+```{r}
+library(dplyr)
+library(tibble)
+
+# The simplest, safest pipeline:
+pca_result <- exp_t %>% 
+  prcomp(center = TRUE, scale = FALSE)
+summary(pca_result)
+```
+
+
 
 ### Plot PC1 vs. PC2 and PC1 vs. PC3, colored by PAM50 subtype and by hierarchical cluster.
 
-### Report the variance explained by the first three PCs. What distinguishes the subtypes?
+```{r}
+library(ggplot2)
+library(dplyr)
 
+# 1. Create a dataframe and combine it with the annotation
+pca_with_annot <- as.data.frame(pca_result$x) %>%
+  merge(anot_paper, by.x = 0, by.y = "barcode") 
+  # by.x = 0 uses the PCA rownames, by.y = "barcode" uses your annotation column
+
+ggplot(pca_with_annot, aes(x = PC1, y = PC2, color = paper_BRCA_Subtype_PAM50)) +
+  geom_point(size = 2, alpha = 0.8) +
+  theme_minimal() +
+  # Optional: You can change the colors manually just like your example
+  scale_color_manual(values = c("Basal" = "red", "Her2" = "blue", 
+                                "LumA" = "darkgreen", "LumB" = "lightgreen", 
+                                "Normal" = "grey"))
+ggplot(pca_with_annot, aes(x = PC1, y = PC3, color = paper_BRCA_Subtype_PAM50)) +
+  geom_point(size = 2, alpha = 0.8) +
+  theme_minimal() +
+  # Optional: You can change the colors manually just like your example
+  scale_color_manual(values = c("Basal" = "red", "Her2" = "blue", 
+                                "LumA" = "darkgreen", "LumB" = "lightgreen", 
+                                "Normal" = "grey"))
+
+```
+
+
+### Report the variance explained by the first three PCs. What distinguishes the subtypes?
+PC1 captures the most variance in the dataset and mainly distinguishes between Basal and Luminal BRCA tumors. This indicates that the biggest biological difference in breast cancer is between hormone-receptor negative (Basal) and hormone-receptor positive (Luminal) tumors.
+
+Even though the plot shows an overlap between Luminal A and Luminal B tumors, PC2 does seem to distinguish them slightly. Furthermore PC2 also seems to distinguish between HER2- and normal-like subtypes. 
+PC3 on the other hand doesnt seem to distinguish between PAM50 subtypes, which indicates that it may distinguish between secondary biological factors, such as Tumor Microenviornment
 ## Step 6 — Differential Expression
 
 ### Use a Wilcoxon rank-sum test (one-vs-rest) to identify marker genes for each PAM50 subtype.
@@ -702,18 +734,10 @@ confusionMatrix(pred_rf, test_data) # enter subtype
 
 ### Critical thinking questions
 
-### Are the molecular subtypes (from expression clustering) concordant with clinical
+### Are the molecular subtypes (from expression clustering) concordant with clinical staging? Where do they disagree?
 
-staging? Where do they disagree?
+### Which data modality — expression or clinical — gives better predictive accuracy for your outcome variable?
 
-### Which data modality — expression or clinical — gives better predictive accuracy for
+### What biological mechanisms might explain the top DEGs found between clinical subgroups?
 
-your outcome variable?
-
-### What biological mechanisms might explain the top DEGs found between clinical
-
-subgroups?
-
-### What are the limitations of the TCGA cohort for clinical prediction (sample size per
-
-stage, selection of academic-centre patients, etc.)?
+### What are the limitations of the TCGA cohort for clinical prediction (sample size per stage, selection of academic-centre patients, etc.)?
