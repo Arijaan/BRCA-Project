@@ -23,6 +23,7 @@ as an `.RData` file.
 
 ```{r}
 load("BRCA_data.RData")
+install.packages("pROC")
 library(dplyr) 
 library(ggplot2) 
 library(pheatmap) 
@@ -30,6 +31,7 @@ library(caret)
 library(tibble)
 library(tidyr)
 library(cluster)
+library(pROC)
 ```
 
 =======
@@ -761,7 +763,7 @@ cat("\n")
 
 ### Define the outcome variable and apply appropriate encoding.
 
-We define vital status as outcome variable (predicting whether a patient is 'Alive' or 'Dead' based strictly on their clinical profile)
+We define vital status as outcome variable (predicting whether a patient is 'Alive' or 'Dead' based on their clinical profile)
 
 ### Select a small set of meaningful features (age, stage, grade, subtype, etc.) and handle missing values by imputation or exclusion.
 
@@ -788,6 +790,9 @@ ml_data <- anot_paper %>%
 ## TRAIN / TEST SPLIT
 set.seed(42) # For reproducible splits
 
+trainIndex <- createDataPartition(ml_data$Target, p = 0.7, list = FALSE)
+train_data <- ml_data[trainIndex, ]
+test_data  <- ml_data[-trainIndex, ]
 
 ## MODEL TRAINING (with 5-fold CV)
 
@@ -809,43 +814,72 @@ print(knn_model)
 
 ### Report confusion matrices, accuracy, sensitivity/specificity, and AUC-ROC for each model.
 ```{r}
+
+set.seed(42) 
 ## PREDICTIONS & CONFUSION MATRICES
 
 # Logistic Regression
-pred_rf_prob <- predict(lr_model, newdata = test_data, type = "prob")$Dead
-pred_rf_class <- predict(lr_model, newdata = test_data, type = "raw")
+pred_lr_class <- predict(lr_model, newdata = test_data)
+pred_rf_class <- predict(rf_model, newdata = test_data)
+pred_knn_class <- predict(knn_model, newdata = test_data)
+
+# Print Confusion Matrices (Includes Accuracy, Sensitivity, Specificity)
 cat("\n--- Logistic Regression Confusion Matrix ---\n")
-cm_rf <- confusionMatrix(pred_rf_class, test_data$Target, positive = "Dead")
-print(cm_rf)
-# ROC curve on test set
-roc_lr <- roc(test_data$Target, pred_lr_prob)
-ggplot(roc_lr, aes(x=))
-
-## Random Forest
-rf_preds <- predict(rf_model, test_data)
-
-## k-Nearest Neighbour
-knn_preds <- predict(knn_model, test_data)
-
-
+confusionMatrix(pred_lr_class, test_data$Target)
 
 cat("\n--- Random Forest Confusion Matrix ---\n")
-print(confusionMatrix(rf_preds, test_data$Target)$overall[1])
-print(confusionMatrix(rf_preds, test_data$Target)$byClass[c(1,2)])
+confusionMatrix(pred_rf_class, test_data$Target)
 
-## Extract the cross-validated AUC values directly from the training objects
-resamps <- resamples(list(LogReg = lr_model, RandomForest = rf_model, KNN = knn_model))
-cat("\n--- AUC-ROC Summary (Cross-Validated) ---\n")
-summary(resamps)$statistics$ROC
+cat("\n--- k-NN Confusion Matrix ---\n")
+confusionMatrix(pred_knn_class, test_data$Target)
+              
 ```
+```{r}
+
+set.seed(42) 
+# AUC-ROC AND PLOTTING
+
+# Get predicted probabilities for the test set (using "Alive" as the event of interest)
+prob_lr  <- predict(lr_model, newdata = test_data, type = "prob")
+prob_rf  <- predict(rf_model, newdata = test_data, type = "prob")
+prob_knn <- predict(knn_model, newdata = test_data, type = "prob")
+
+# Compute ROC
+roc_logit <- roc(response = test_data$Target, predictor = prob_lr$Alive, levels = c("Alive", "Dead"))
+roc_rf    <- roc(response = test_data$Target, predictor = prob_rf$Alive, levels = c("Alive", "Dead"))
+roc_knn   <- roc(response = test_data$Target, predictor = prob_knn$Alive, levels = c("Alive", "Dead"))
+
+# Print AUC values
+cat("\n--- AUC Values ---\n")
+cat("Logistic Regression AUC:", roc_logit$auc, "\n")
+cat("Random Forest AUC:", roc_rf$auc, "\n")
+cat("k-NN AUC:", roc_knn$auc, "\n")
+
+# Plot ROC curves
+plot(roc_logit, col = "blue", main = "ROC Curves (Test Set)", lwd = 2)
+lines(roc_rf, col = "green", lwd = 2)
+lines(roc_knn, col = "red", lwd = 2)
+legend("bottomright", legend = c("Logistic Regression", "Random Forest", "k-NN"),
+       col = c("blue", "green", "red"), lwd = 2)
+```
+
+
 
 ### Identify the most predictive clinical features: variable importance from RF, and coefficients from Logistic Regression. Note that k-NN does not provide native feature importance.
 ```{r}
-cat("\n--- Feature Importance (Random Forest) ---\n")
-print(varImp(rf_model))
+set.seed(42) 
+# Random Forest Variable Importance Plot
+rf_importance <- varImp(rf_model, scale = FALSE)
+plot(rf_importance, main = "Random Forest Feature Importance")
 
-cat("\n--- Coefficients (Logistic Regression) ---\n")
-print(summary(lr_model$finalModel)$coefficients)
+# Logistic Regression Coefficients / Importance
+# Using summary() to see raw coefficients and p-values
+cat("\n--- Logistic Regression Coefficients ---\n")
+summary(lr_model$finalModel)
+
+# Optional: Plot Logistic Regression Variable Importance
+lr_importance <- varImp(lr_model, scale = FALSE)
+plot(lr_importance, main = "Logistic Regression Feature Importance")
 ```
 
 
