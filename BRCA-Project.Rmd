@@ -320,16 +320,14 @@ exp_t <- t(brca_exp_numeric)
 D <- dist(exp_t)
 
 # 2. HIERARCHICAL CLUSTERING
-# FIX: Use 'D' instead of 'sample_dist'
 hc_result <- hclust(D, method = "ward.D2")
 
 # 3. SILHOUETTE ANALYSIS (Mathematical k)
-# We let this print directly to the Rmarkdown document instead of hiding it in a PDF
-km <- kmeans(x = exp_t, centers = 5, nstart = 10)
+km <- kmeans(x = exp_t, centers = 2, nstart = 10)
 s <- silhouette(km$cluster, D)
 
-cat("Average silhouette for k=5:", mean(s[, 3]), "\n")
-plot(s, col = "blue", border = NA, main = "Silhouette Plot for K-means (k=5)")
+cat("Average silhouette for k=2:", mean(s[, 3]), "\n")
+plot(s, col = "blue", border = NA, main = "Silhouette Plot for K-means (k=2)")
 ```
 
 ## Cut the dendrogram to obtain k clusters (choose k; justify your choice).
@@ -720,29 +718,136 @@ sum(is.na(anot_paper$paper_BRCA_Subtype_PAM50))
 ## Patholgical Stage
 plot_stage <- anot_paper %>%
   drop_na(paper_pathologic_stage) %>%
-  ggplot(aes(x = paper_pathological_stage)) +
+  ggplot(aes(x = paper_pathologic_stage)) +
   geom_bar(fill = "red", alpha = 0.7) +
-  labs(title = "Pathologic Stage", x = "Stage", y = "Count") 
+  labs(title = "Pathologic Stage", x = "Stage", y = "Count")
+plot_age <- ggplot(anot_paper, aes(x = paper_age_at_initial_pathologic_diagnosis)) +
+  geom_histogram(fill = "steelblue", color = "black", bins = 25, alpha = 0.7) +
+  labs(title = "Age at Diagnosis", x = "Age (Years)", y = "Count")
+print(plot_age)
+print(plot_stage)
+cat("--- BRCA Pathology (IDC vs ILC) ---\n")
+print(table(anot_paper$paper_BRCA_Pathology, useNA = "ifany"))
+
 ```
 
 
 ### Tabulate paper_vital_status and compute median follow-up time.
+```{r}
+cat("--- Vital Status ---")
+print(table(anot_paper$paper_vital_status, useNA = "ifany"))
 
+median_followup_days <- median(anot_paper$paper_days_to_last_followup, na.rm = TRUE)
+print(median_followup_days)
+```
 ### Examine multi-omic cluster columns (paper_CNV.Clusters, paper_mRNA.Clusters, paper_Protein.Clusters) — how do they relate to PAM50?
+```{r}
+cat("--- mRNA Clusters vs PAM50 ---\n")
+print(table(Cluster = anot_paper$paper_mRNA.Clusters, PAM50 = anot_paper$paper_BRCA_Subtype_PAM50))
+cat("\n")
 
+cat("--- CNV (Copy Number) Clusters vs PAM50 ---\n")
+print(table(Cluster = anot_paper$paper_CNV.Clusters, PAM50 = anot_paper$paper_BRCA_Subtype_PAM50))
+cat("\n")
+
+cat("--- Protein Clusters vs PAM50 ---\n")
+print(table(Cluster = anot_paper$paper_Protein.Clusters, PAM50 = anot_paper$paper_BRCA_Subtype_PAM50))
+cat("\n")
+```
+ 
 ## Step C — Clinical Feature Classification
 
 ### Predict a binary or multi-class clinical outcome using clinical variables only (no expression data).
 
 ### Define the outcome variable and apply appropriate encoding.
 
+We define vital status as outcome variable (predicting whether a patient is 'Alive' or 'Dead' based strictly on their clinical profile)
+
 ### Select a small set of meaningful features (age, stage, grade, subtype, etc.) and handle missing values by imputation or exclusion.
+
+```{r}
+# We select features, drop missing values, and encode categorical data as factors
+ml_data <- anot_paper %>%
+  select(paper_vital_status, paper_age_at_initial_pathologic_diagnosis, 
+         paper_pathologic_stage, paper_BRCA_Subtype_PAM50) %>%
+  drop_na() %>%
+  mutate(
+    Target = factor(paper_vital_status, levels = c("Alive", "Dead")),
+    Age = paper_age_at_initial_pathologic_diagnosis,
+    Stage = as.factor(paper_pathologic_stage),
+    PAM50 = as.factor(paper_BRCA_Subtype_PAM50)
+  ) %>%
+  select(-paper_vital_status, -paper_age_at_initial_pathologic_diagnosis, 
+         -paper_pathologic_stage, -paper_BRCA_Subtype_PAM50)
+
+```
 
 ### Train/test split (70/30 or 5-fold CV). Fit: Logistic Regression, Random Forest, k-NN.
 
+```{r}
+## TRAIN / TEST SPLIT
+set.seed(42) # For reproducible splits
+
+
+## MODEL TRAINING (with 5-fold CV)
+
+cv_ctrl <- trainControl(method = "cv", number = 5, classProbs = TRUE, summaryFunction = twoClassSummary, savePredictions = "final")
+
+lr_model <- train(Target ~ ., data = train_data, method = "glm", family = "binomial",
+                  trControl = cv_ctrl, metric = "ROC")
+rf_model <- train(Target ~ ., data = train_data, method = "rf", 
+                  trControl = cv_ctrl, metric = "ROC")
+# k-NN relies on distance, so we MUST center and scale the Age variable automatically
+knn_model <- train(Target ~ ., data = train_data, method = "knn", 
+                   trControl = cv_ctrl, metric = "ROC", preProcess = c("center", "scale"))
+
+print(lr_model)
+print(rf_model)
+print(knn_model)
+```
+
+
 ### Report confusion matrices, accuracy, sensitivity/specificity, and AUC-ROC for each model.
+```{r}
+## PREDICTIONS & CONFUSION MATRICES
+
+# Logistic Regression
+pred_rf_prob <- predict(lr_model, newdata = test_data, type = "prob")$Dead
+pred_rf_class <- predict(lr_model, newdata = test_data, type = "raw")
+cat("\n--- Logistic Regression Confusion Matrix ---\n")
+cm_rf <- confusionMatrix(pred_rf_class, test_data$Target, positive = "Dead")
+print(cm_rf)
+# ROC curve on test set
+roc_lr <- roc(test_data$Target, pred_lr_prob)
+ggplot(roc_lr, aes(x=))
+
+## Random Forest
+rf_preds <- predict(rf_model, test_data)
+
+## k-Nearest Neighbour
+knn_preds <- predict(knn_model, test_data)
+
+
+
+cat("\n--- Random Forest Confusion Matrix ---\n")
+print(confusionMatrix(rf_preds, test_data$Target)$overall[1])
+print(confusionMatrix(rf_preds, test_data$Target)$byClass[c(1,2)])
+
+## Extract the cross-validated AUC values directly from the training objects
+resamps <- resamples(list(LogReg = lr_model, RandomForest = rf_model, KNN = knn_model))
+cat("\n--- AUC-ROC Summary (Cross-Validated) ---\n")
+summary(resamps)$statistics$ROC
+```
 
 ### Identify the most predictive clinical features: variable importance from RF, and coefficients from Logistic Regression. Note that k-NN does not provide native feature importance.
+```{r}
+cat("\n--- Feature Importance (Random Forest) ---\n")
+print(varImp(rf_model))
+
+cat("\n--- Coefficients (Logistic Regression) ---\n")
+print(summary(lr_model$finalModel)$coefficients)
+```
+
 
 ## Step D — Integrative Analysis (Expression + Clinical)
 
