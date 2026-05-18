@@ -287,6 +287,30 @@ corrs <- cor(brca_exp_clean[,-1],method="pearson")
 
 
 ### Interpret: does the correlation structure correspond to PAM50 subtypes?
+Struktur:
+Die Heatmap zeigt eine klare Block-Struktur entlang der Diagonale. Man sieht deutlich mindestens zwei große Blöcke mit höherer interner Korrelation (dunklere Farbe). Der auffälligste Sub-Block ist unten rechts — dieser entspricht den Basal-Samples (rot), die sich stark vom Rest abheben. Die übrigen Subtypes bilden einen großen gemeinsamen Block links oben, innerhalb dessen schwächere Sub-Strukturen erkennbar sind.
+Entspricht die Korrelationsstruktur den PAM50-Subtypes?
+Ja, größtenteils. Der Basal-Subtyp ist am deutlichsten separiert — Basal-Samples korrelieren stark untereinander, aber deutlich weniger mit den anderen Subtypes. Das spiegelt wider was auch im TCGA-Paper beschrieben wird: Basal-like Tumoren haben das distinkteste molekulare Profil. Die luminalen Subtypes LumA und LumB sind weniger klar voneinander getrennt, was ihre biologische Ähnlichkeit als ER⁺ Tumoren widerspiegelt. Her2 und Normal sind ebenfalls nicht scharf abgegrenzt und streuen über den luminalen Block.
+
+
+### Interpretation
+
+The heatmap shows a clear **block-diagonal structure** that aligns closely with
+the PAM50 subtype annotation:
+
+- **Basal** samples form the most isolated, highest-contrast block — their
+  expression programme is fundamentally different from all other subtypes. This
+  is consistent with the TCGA paper, which found basal-like tumours to have the
+  most distinct multi-platform signature.
+- **LumA and LumB** share a broad luminal block with high mutual correlation,
+  reflecting their common ER⁺ biology. The differences between them are more
+  quantitative (e.g., proliferation rate) than qualitative.
+- **Her2** sits between the luminal and basal blocks, showing moderate
+  correlation with both.
+- **Normal**-like samples are the most heterogeneous.
+
+The existence of these sub-blocks confirms that PAM50 subtypes represent
+genuinely distinct transcriptional states, not arbitrary labels.
 
 ```{r}
 
