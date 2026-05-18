@@ -1,25 +1,26 @@
 ---
 title: "BRCA-Project"
 output: html_notebook
+editor_options: 
+  markdown: 
+    wrap: 72
 ---
-
 
 # PROJECT 1 — TCGA-BRCA \| Breast Invasive Carcinoma
 
-This project analyses RNA-seq gene expression data from The Cancer Genome Atlas
-(TCGA) BRCA cohort. The goal is to predict PAM50 molecular subtypes and
-integrate clinical metadata for biological interpretation.
+This project analyses RNA-seq gene expression data from The Cancer
+Genome Atlas (TCGA) BRCA cohort. The goal is to predict PAM50 molecular
+subtypes and integrate clinical metadata for biological interpretation.
 
-**Reference:** The Cancer Genome Atlas Network (2012). Comprehensive molecular
-portraits of human breast tumours. *Nature*, 490, 61–70.
+**Reference:** The Cancer Genome Atlas Network (2012). Comprehensive
+molecular portraits of human breast tumours. *Nature*, 490, 61–70.
 
----
+------------------------------------------------------------------------
 
 ## Setup — Load Libraries & Data
 
-We load all required packages and the BRCA dataset provided
-as an `.RData` file.
-## Cleaning annotations
+We load all required packages and the BRCA dataset provided as an
+`.RData` file. \## Cleaning annotations
 
 ```{r}
 load("BRCA_data.RData")
@@ -31,12 +32,15 @@ library(tibble)
 library(tidyr)
 library(cluster)
 library(pROC)
+library(randomForest)
 ```
 
 =======
 
-# Part I - Gene Expression Analysis 
+# Part I - Gene Expression Analysis
+
 ## Step 1 — Data Structure Investigation
+
 ### How many samples and genes are in the expression matrix?
 
 ```{r}
@@ -45,10 +49,13 @@ library(pROC)
 dim <- dim(brca_exp_clean)
 df_dims <- data.frame("Genes" = dim[1], "Samples" = dim[2]) ; df_dims
 ```
-### How many annotation columns are retained after cleaning to paper_ columns?
+
+### How many annotation columns are retained after cleaning to paper\_ columns?
+
 We keep only the curated publication-level columns (those starting with
 `paper_`) plus the `barcode` identifier. This filters out internal TCGA
 processing columns that are not relevant for our analysis.
+
 ```{r}
 # --- 1. Samples and Genes in the Expression Matrix ---
 
@@ -62,8 +69,9 @@ df_dims <- data.frame("Samples" = dim[1], "annotations" = dim[2]) ; df_dims
 
 ### What is the sample count per PAM50 subtype (paper_BRCA_Subtype_PAM50)?
 
-papter_BRCA-Subtype_PAM50 is our primary target variable. The PAM50 classifier assigns each tumour to one of five intrinsic subtypes: Basal, Her2, LumA, LumB, and Normal-like.
-
+papter_BRCA-Subtype_PAM50 is our primary target variable. The PAM50
+classifier assigns each tumour to one of five intrinsic subtypes: Basal,
+Her2, LumA, LumB, and Normal-like.
 
 ```{r}
 # Shows all PAM50 subtypes in a table. The "ifany" argument adds a column with the NA count if there are any NAs available.
@@ -87,8 +95,8 @@ data.frame("Valid_PAM50_subtypes" = valid_target_samples, "NA" = length(anot_pap
 
 ## significant breast cancer genes from the paper:
 
-PIK3CA, PTEN, AKT1, TP53, GATA3, CDH1, RB1, MLL3, MAP3K1, CDKN1B, TBX3, RUNX1, CBFB, AFF2, PIK3R1, PTPN22, PTPRD, NF1, SF3B1 and CCND3
-
+PIK3CA, PTEN, AKT1, TP53, GATA3, CDH1, RB1, MLL3, MAP3K1, CDKN1B, TBX3,
+RUNX1, CBFB, AFF2, PIK3R1, PTPN22, PTPRD, NF1, SF3B1 and CCND3
 
 ## How many annotation columns are retained after cleaning to paper\_ columns?
 
@@ -101,7 +109,6 @@ PIK3CA, PTEN, AKT1, TP53, GATA3, CDH1, RB1, MLL3, MAP3K1, CDKN1B, TBX3, RUNX1, C
 num_paper_cols <- ncol(anot_paper) - 1 # Subtract 1 to exclude the 'barcode' column
 cat("Number of paper_ columns retained:", num_paper_cols, "\n")
 ```
-
 
 ## Step 2 — Expression Distribution Analysis
 
@@ -127,7 +134,6 @@ geom_boxplot(alpha = 0.7, outlier.size = 0.5) +
 
 
 ```
-
 
 ### Select the top 5 and bottom 5 most variable genes (by standard deviation); plot their distributions and compare.
 
@@ -175,22 +181,29 @@ ggplot(var_exp, aes(x = reorder(gene, Expression, FUN = median),
 
 ```
 
-
 ## Step 3 — Correlation Analysis
+
 ## Prerequisite — Sample Alignment
 
-Before running any analysis that combines the expression matrix with the annotation file, we must ensure that both objects contain **exactly the same samples in the same order**. Mismatches would silently corrupt all downstream results.
+Before running any analysis that combines the expression matrix with the
+annotation file, we must ensure that both objects contain **exactly the
+same samples in the same order**. Mismatches would silently corrupt all
+downstream results.
+
 ```{r}
 #First set the column "gene" as rownames 
 brca_exp_clean_ctr <- brca_exp_clean %>%
   column_to_rownames("gene")
 ```
 
-```{r} 
+```{r}
 # TRUE = Reihenfolge stimmt bereits überein, kein Alignment nötig
 all(colnames(brca_exp_clean_ctr) == anot_paper$barcode)
-``` 
-Because the the result says "TRUE" we don't need to correct the alginment. The order and dimensions are aligned. Else we would have to write the following aligmentprompt: 
+```
+
+Because the the result says "TRUE" we don't need to correct the
+alginment. The order and dimensions are aligned. Else we would have to
+write the following aligmentprompt:
 
 ```{r}
 #Find samples that appear in BOTH the expression matrix "brca_exp_clean" AND the significant annotation file "anot_paper"
@@ -215,9 +228,17 @@ dim(anot_clean)
 ```
 
 ### Compute pairwise Pearson correlations across all samples using the full gene set.
-We compute **pairwise Pearson correlations** between all samples using the full gene set. The resulting n×n correlation matrix is visualised as a heatmap. Samples are annotated by PAM50 subtype so we can judge whether the correlation structure reflects known biology.
 
-The Pearson correlation measures linear co-expression: two samples with similar expression profiles across all genes will have a correlation close to 1. If PAM50 subtypes are transcriptionally distinct, we expect to see high within-subtype correlations forming visible blocks along the diagonal.
+We compute **pairwise Pearson correlations** between all samples using
+the full gene set. The resulting n×n correlation matrix is visualised as
+a heatmap. Samples are annotated by PAM50 subtype so we can judge
+whether the correlation structure reflects known biology.
+
+The Pearson correlation measures linear co-expression: two samples with
+similar expression profiles across all genes will have a correlation
+close to 1. If PAM50 subtypes are transcriptionally distinct, we expect
+to see high within-subtype correlations forming visible blocks along the
+diagonal.
 
 ```{r}
 #calculate Pearson-correlation matrix between all samples. 
@@ -280,7 +301,9 @@ highly_correlated_genes
 cat("Correlation matrix dimensions:", dim(cor_mat)[1], "x", dim(cor_mat)[2], "\n")
 cat("Value range: [", round(min(cor_mat), 3), ",", round(max(cor_mat), 3), "]\n")
 ```
+
 ### Visualize as a correlation heatmap. What structure do you observe? Are there sub- blocks?
+
 ```{r}
 #colors for PAM50-Subtpyes
 pam50_colors <- c(
@@ -312,45 +335,47 @@ pheatmap(
 )
 ```
 
-
 ### Interpret: does the correlation structure correspond to PAM50 subtypes?
-Struktur:
-Die Heatmap zeigt eine klare Block-Struktur entlang der Diagonale. Man sieht deutlich mindestens zwei große Blöcke mit höherer interner Korrelation (dunklere Farbe). Der auffälligste Sub-Block ist unten rechts — dieser entspricht den Basal-Samples (rot), die sich stark vom Rest abheben. Die übrigen Subtypes bilden einen großen gemeinsamen Block links oben, innerhalb dessen schwächere Sub-Strukturen erkennbar sind.
-Entspricht die Korrelationsstruktur den PAM50-Subtypes?
-Ja, größtenteils. Der Basal-Subtyp ist am deutlichsten separiert — Basal-Samples korrelieren stark untereinander, aber deutlich weniger mit den anderen Subtypes. Das spiegelt wider was auch im TCGA-Paper beschrieben wird: Basal-like Tumoren haben das distinkteste molekulare Profil. Die luminalen Subtypes LumA und LumB sind weniger klar voneinander getrennt, was ihre biologische Ähnlichkeit als ER⁺ Tumoren widerspiegelt. Her2 und Normal sind ebenfalls nicht scharf abgegrenzt und streuen über den luminalen Block.
 
+Struktur: Die Heatmap zeigt eine klare Block-Struktur entlang der
+Diagonale. Man sieht deutlich mindestens zwei große Blöcke mit höherer
+interner Korrelation (dunklere Farbe). Der auffälligste Sub-Block ist
+unten rechts — dieser entspricht den Basal-Samples (rot), die sich stark
+vom Rest abheben. Die übrigen Subtypes bilden einen großen gemeinsamen
+Block links oben, innerhalb dessen schwächere Sub-Strukturen erkennbar
+sind. Entspricht die Korrelationsstruktur den PAM50-Subtypes? Ja,
+größtenteils. Der Basal-Subtyp ist am deutlichsten separiert —
+Basal-Samples korrelieren stark untereinander, aber deutlich weniger mit
+den anderen Subtypes. Das spiegelt wider was auch im TCGA-Paper
+beschrieben wird: Basal-like Tumoren haben das distinkteste molekulare
+Profil. Die luminalen Subtypes LumA und LumB sind weniger klar
+voneinander getrennt, was ihre biologische Ähnlichkeit als ER⁺ Tumoren
+widerspiegelt. Her2 und Normal sind ebenfalls nicht scharf abgegrenzt
+und streuen über den luminalen Block.
 
 ### Interpretation
 
-The heatmap shows a clear **block-diagonal structure** that aligns closely with
-the PAM50 subtype annotation:
+The heatmap shows a clear **block-diagonal structure** that aligns
+closely with the PAM50 subtype annotation:
 
-- **Basal** samples form the most isolated, highest-contrast block — their
-  expression programme is fundamentally different from all other subtypes. This
-  is consistent with the TCGA paper, which found basal-like tumours to have the
-  most distinct multi-platform signature.
-- **LumA and LumB** share a broad luminal block with high mutual correlation,
-  reflecting their common ER⁺ biology. The differences between them are more
-  quantitative (e.g., proliferation rate) than qualitative.
-- **Her2** sits between the luminal and basal blocks, showing moderate
-  correlation with both.
-- **Normal**-like samples are the most heterogeneous.
+-   **Basal** samples form the most isolated, highest-contrast block —
+    their expression programme is fundamentally different from all other
+    subtypes. This is consistent with the TCGA paper, which found
+    basal-like tumours to have the most distinct multi-platform
+    signature.
+-   **LumA and LumB** share a broad luminal block with high mutual
+    correlation, reflecting their common ER⁺ biology. The differences
+    between them are more quantitative (e.g., proliferation rate) than
+    qualitative.
+-   **Her2** sits between the luminal and basal blocks, showing moderate
+    correlation with both.
+-   **Normal**-like samples are the most heterogeneous.
 
 The existence of these sub-blocks confirms that PAM50 subtypes represent
 genuinely distinct transcriptional states, not arbitrary labels.
 
-```{r}
-
-pheatmap(corrs, cluster_rows = FALSE,
-  cluster_cols = FALSE, show_rownames = F,
-  show_colnames = F)
-
-# Jungs ich weiß nicht ob das hier richtig ist, aber so siehts gerade mit dem heatmap aus: -@Arijaan
-
-```
-
-
 ## Step 4 — Hierarchical Clustering
+
 ### Cluster samples using hclust.
 
 ```{r step4-clustering-and-silhouette, fig.width=10, fig.height=6}
@@ -424,10 +449,10 @@ print("Cluster Membership vs. PAM50 Subtypes (k=5):")
 print(comparison_table_5)
 ```
 
-
 ## Step 5 — PCA Visualization
 
 ### Run prcomp on the transposed expression matrix (samples as rows).
+
 ```{r}
 library(dplyr)
 library(tibble)
@@ -437,8 +462,6 @@ pca_result <- exp_t %>%
   prcomp(center = TRUE, scale = FALSE)
 summary(pca_result)
 ```
-
-
 
 ### Plot PC1 vs. PC2 and PC1 vs. PC3, colored by PAM50 subtype and by hierarchical cluster.
 
@@ -468,20 +491,34 @@ ggplot(pca_with_annot, aes(x = PC1, y = PC3, color = paper_BRCA_Subtype_PAM50)) 
 
 ```
 
-
 ### Report the variance explained by the first three PCs. What distinguishes the subtypes?
-PC1 captures the most variance in the dataset and mainly distinguishes between Basal and Luminal BRCA tumors. This indicates that the biggest biological difference in breast cancer is between hormone-receptor negative (Basal) and hormone-receptor positive (Luminal) tumors.
 
-Even though the plot shows an overlap between Luminal A and Luminal B tumors, PC2 does seem to distinguish them slightly. Furthermore PC2 also seems to distinguish between HER2- and normal-like subtypes. 
-PC3 on the other hand doesnt seem to distinguish between PAM50 subtypes, which indicates that it may distinguish between secondary biological factors, such as Tumor Microenviornment
+PC1 captures the most variance in the dataset and mainly distinguishes
+between Basal and Luminal BRCA tumors. This indicates that the biggest
+biological difference in breast cancer is between hormone-receptor
+negative (Basal) and hormone-receptor positive (Luminal) tumors.
+
+Even though the plot shows an overlap between Luminal A and Luminal B
+tumors, PC2 does seem to distinguish them slightly. Furthermore PC2 also
+seems to distinguish between HER2- and normal-like subtypes. PC3 on the
+other hand doesnt seem to distinguish between PAM50 subtypes, which
+indicates that it may distinguish between secondary biological factors,
+such as Tumor Microenviornment
 
 ## Step 6 — Differential Expression
-We use a **Wilcoxon rank-sum test* in a **one-vs-rest* design to find marker genes for each PAM50 subtype. For every gene we test if it shows a significant difference in expression in one subtype compared to all other subtypes combined.
 
-A Wilcoxon test is used because it is **non-parametric**, which means it does not assume a normal distrubution. This is appropriate for RNA-seq date that can be skewed. Also it is robost to outliers
+We use a **Wilcoxon rank-sum test\* in a** one-vs-rest\* design to find
+marker genes for each PAM50 subtype. For every gene we test if it shows
+a significant difference in expression in one subtype compared to all
+other subtypes combined.
 
-After testing, we apple **Benjamini-Hochberg FDR correction** (BH) to police the false discovery rate across the many tests performed.
-Also we report the **top 20 genes per subtype** sorted by adjusted p value.
+A Wilcoxon test is used because it is **non-parametric**, which means it
+does not assume a normal distrubution. This is appropriate for RNA-seq
+date that can be skewed. Also it is robost to outliers
+
+After testing, we apple **Benjamini-Hochberg FDR correction** (BH) to
+police the false discovery rate across the many tests performed. Also we
+report the **top 20 genes per subtype** sorted by adjusted p value.
 
 ### Use a Wilcoxon rank-sum test (one-vs-rest) to identify marker genes for each PAM50 subtype.
 
@@ -512,30 +549,76 @@ do.call(rbind, results)
 #lapply tales test_subtype for each of the 5 subtypes, the result is a list of 5 data frames with each having 2994 rows. do.call glues them together again resulting in a dataframe of 14970 rows
 de_results <- do.call(rbind, lapply(subtypes, wilcoxon_one_vs_rest))
 
+
 ```
 
 ### Apply FDR correction (BH). Report the top 20 genes per subtype by adjusted p-value and log2 fold-change.
-We have executed 14970 tests. That leads to many random false-positives. p.adjust(method = "B") corrects p-values using the Benjamini-Hochberg method. group_by(subtype) ensures a seperate correction by subtype and mutate adds the corrected p-values as a new column p_adj
+
+We have executed 14970 tests. That leads to many random false-positives.
+p.adjust(method = "B") corrects p-values using the Benjamini-Hochberg
+method. group_by(subtype) ensures a seperate correction by subtype and
+mutate adds the corrected p-values as a new column p_adj
+
 ```{r}
 de_results <- de_results %>%
   group_by(subtype) %>%
-  mutate(p_adj = p.adjust(p_value, method = "BH")) %>%
+  mutate(p_adj = p.adjust(p_value, method = "BH")) %>% # Benjamin Hochberg FDR adjustment (rank based)
   ungroup()
 ```
-Top report the top 20 genes per subtype by adjusted p-value and log2 fold-change we first sort by smalles p_adj (most significant first) and if p_adj valuea are eequal then sort by highest absolute log2FC (strongest effect first). slice_head(n=20) only keeps the top 20 genes per subtype. abs() is used because we want both up- and downregulated genes.
+
+Top report the top 20 genes per subtype by adjusted p-value and log2
+fold-change we first sort by smalles p_adj (most significant first) and
+if p_adj valuea are eequal then sort by highest absolute log2FC
+(strongest effect first). slice_head(n=20) only keeps the top 20 genes
+per subtype. abs() is used because we want both up- and downregulated
+genes.
+
 ```{r}
 top20 <- de_results %>% 
   group_by(subtype) %>% 
-  arrange(p_adj, des(abs(log2FC))) %>% 
+  arrange(p_adj, desc(abs(log2FC))) %>% # adds expression data
   slice_head(n=20) %>% 
   ungroup() #undos the group_by(subtype)
 top20
+
+```
+
+```{r}
+
+# Arijaan:
+# heatmap with the adjusted p-values. change p_adj to log2fc for the expression.
+heatmap_data <- top20 %>%
+  select(gene, subtype, p_adj) %>%
+  pivot_wider(names_from = subtype, values_from = p_adj)
+
+# 2. Convert to a true numeric matrix with gene names as row names
+heatmap_matrix <- as.matrix(heatmap_data[, -1])
+rownames(heatmap_matrix) <- heatmap_data$gene
+
+# 3. Replace any missing values (NAs) with 0 if necessary
+heatmap_matrix[is.na(heatmap_matrix)] <- 0
+
+color_palette <- colorRampPalette(c("navy", "white", "firebrick3"))(50)
+
+# Plot the heatmap
+pheatmap(
+  t(heatmap_matrix),
+  color = color_palette,
+  cluster_rows = TRUE,         # Automatically groups genes with similar patterns
+  cluster_cols = TRUE,         # Automatically groups subtypes with similar patterns
+  scale = "none",              # 'none' because values are already log2FC scales
+  border_color = "white",      # Clean cell borders
+  display_numbers = FALSE,     # Set to TRUE if you want text values inside the cells
+  main = "Differential Gene Expression (p_adj) per Subtype"
+)
 ```
 
 ### Generate an annotated heatmap (rows = top DEGs, columns = samples, annotation bars = PAM50 subtype and pathologic stage).
-Annotated heatmap of the Top DEGs (Z-score normalised). 
+
+Annotated heatmap of the Top DEGs (Z-score normalised).
+
 ```{r}
-top_genes_names <- unique(top20$gene) #generates all uniqzue gene names of the top 20 of all subtypes (max 5*20 = 100 genes). 
+top_gene_names <- unique(top20$gene) #generates all uniqzue gene names of the top 20 of all subtypes (max 5*20 = 100 genes). 
 #We cut those genes from the expression matrix and perform a z-score-normalization. Scale() usually normalizes by row, but by column is needed thats why doubled transpontation is needed. After normalization 0 means average expression, +2 means two standardeviations above average. This is important so the colours of the heatmap show relative expression and not the abolute values. Else genes with a high overall expression would dominate the colorprofile
 heatmap_mat     <- as.matrix(expr_clean[top_gene_names,])
 heatmap_z       <- t(scale(t(heatmap_mat)))
@@ -548,10 +631,14 @@ col_annotation <- data.frame(
 )
 
 #sorting of the heatmap columns and the annotation in the same order -> all basal samples together, then Her2 and so forth. With that the subtype blocks become more apparent
-col_order <- order(col_annotation$PAM50)
+col_order <- order(col_annotation$pam50)
 heatmap_z_sorted <- heatmap_z[, col_order]
 col_annot_sorted <- col_annotation[col_order, , drop = FALSE]
 
+
+  
+## annotation_colors braucht variablen die nicht vorhanden sind. vllcht sind die in col_annotation?? 
+# Der funktioniert aber wenn man die Zeile rausnimmt. 
 pheatmap(
   heatmap_z_sorted,
   annotation_col = col_annot_sorted,
@@ -565,6 +652,7 @@ pheatmap(
   fontsize_row = 6
 )
 ```
+
 ## Step 7 — Prediction Models
 
 ### Split data 70/30 (stratified by subtype).
@@ -600,6 +688,12 @@ df <- df[, !too_many_nas]
 ### Binary task — tumor vs. normal: Logistic Regression, Random Forest, k-NN. Report confusion matrices and AUC-ROC.
 
 #### Logistic regression
+
+We do not have any data for "normal" patients. The next closest thing to
+normal is the normal subtype amoung the PAM50 subtypes so we take this
+subtype and compare it against the rest. Here we do not expect good
+models since the normal subtype is not that different than the other
+subtypes according to the PCA.
 
 For binary analysis of the data, we need to annotate the subtypes
 properly, so that we have either a "normal" or a "tumor". For this, we
@@ -652,8 +746,7 @@ binary_data$paper_BRCA_Subtype_PAM50 <- factor(binary_data$paper_BRCA_Subtype_PA
 #olevels <- lapply(1:length(colnames(binary_data)),function(x){levels(binary_data[,x])})
 ```
 
-
-```{r Logistic regression}
+```{r}
 
 # -----------------Using caret to create the test and training data------------
 set.seed(161)
@@ -662,6 +755,10 @@ trainIndex <- createDataPartition(binary_data$paper_BRCA_Subtype_PAM50,
 
 train_data <- binary_data[trainIndex, ]
 test_data  <- binary_data[-trainIndex, ]
+
+```
+
+```{r Logistic regression}
 
 # Creating the model using the glm function from the stats library while using the binomial family to specify the type as a logistic regression. 
 
@@ -678,16 +775,28 @@ confusionMatrix(pred_logit, test_data$paper_BRCA_Subtype_PAM50)
 
 ```
 
+Here the model obviously lazily gusses all entries as tumor since the
+training data only had 28 patients with normal type PAM50 subtype.
+
 ```{r}
-# Normalize features without classification parameter
+# testblock
+train_control <- trainControl(
+  method = "repeatedcv",
+  number = 5,
+  repeats = 3,
+  classProbs = TRUE,
+  summaryFunction = multiClassSummary, # Handles multi-class data evaluation
+  sampling = "down"                    # Fixes class imbalance automatically
+)
 
-preproc <- preProcess(train_data[, -4], method = c("center", "scale"))
-train_norm <- predict(preproc, train_data[, -4])
-test_norm <- predict(preproc, test_data[, -4])
-
-# Add Subtype back
-train_norm <- train_data
-test_norm <- test_data
+# Fit a Random Forest or Penalized Multinomial Model
+optimized_model <- train(
+  paper_BRCA_Subtype_PAM50 ~ ., 
+  data = train_data, 
+  method = "rf", # or "glmnet" for lasso/elastic net
+  metric = "Balanced_Accuracy",
+  trControl = train_control
+)
 ```
 
 #### K-Nearest Neighbor:
@@ -699,20 +808,23 @@ model_knn <- train(
   paper_BRCA_Subtype_PAM50 ~ .,
   data = train_data,
   method = "knn",
-  tuneGrid = expand.grid(k = 1:10),
-  trControl = trainControl(method = "cv", number = 5, classProbs = TRUE)
+  tuneGrid = expand.grid(k = seq(3, 21, by = 2)),  # Wider range for ~200 samples
+  trControl = trainControl(
+    method = "cv", 
+    number = 5, 
+    classProbs = TRUE,
+    summaryFunction = twoClassSummary  # Binary-specific metrics
+  ),
+  preProcess = c("center", "scale"),  # CRITICAL for kNN
+  metric = "ROC"  # Better than Accuracy for class imbalance (lots more tumor)
 )
-```
 
-```{r}
+# Plot k tuning
+plot(model_knn)
 
-# Predict
-knn_probs <- predict(model_knn, test_norm, type = "raw")
-
-confusionMatrix(knn_probs, test_norm$paper_BRCA_Subtype_PAM50)
-length(test_norm$paper_BRCA_Subtype_PAM50)
-model_knn
-
+# Predict directly on test_data (no need for test_norm)
+pred_knn <- predict(model_knn, test_data)
+confusionMatrix(pred_knn, test_data$paper_BRCA_Subtype_PAM50)
 ```
 
 ```{r}
@@ -726,15 +838,7 @@ ggplot(model_knn$results, aes(x = k, y = Accuracy)) +
 
 #### Random forest
 
-------------------------------------------------------------------------
-
-### Multiclass task — predict PAM50 subtype: Random Forest, Multinomial Logistic Regression, k-NN.
-
-#### Random Forest:
-
 ```{r}
-library(randomForest)
-
 # Fit the random forest model
 # Using caret to create the test and training data
 
@@ -748,12 +852,93 @@ pred_rf <- predict(model_rf, test_data)
 confusionMatrix(pred_rf, test_data$paper_BRCA_Subtype_PAM50)
 ```
 
-Binary classification doesn't work at all since the normal subtype is not
-easily found among the other PAM50 subtypes. This makes the model
+Binary classification doesn't work at all since the normal subtype is
+not easily found among the other PAM50 subtypes. This makes the model
 strongly biased towards a positive guess, which results in the high
 sensitivity and low specificity scores throughout.
+------------------------------------------------------------------------
+
+### Multiclass task — predict PAM50 subtype: Random Forest, Multinomial Logistic Regression, k-NN.
+
+#### Random Forest:
+
+```{r}
+set.seed(161)
+
+sig_genes <- head(gene_variability, 30) %>% 
+  filter(!gene==highly_correlated_genes)
+
+gene_indexes <- as.vector(rownames(column_to_rownames(sig_genes,"gene"))) 
+
+exp_cols <- as.data.frame(exp_t[,gene_indexes]) %>% rownames_to_column("barcode")
+
+
+multi_data <- brca_anot_clean %>% 
+  inner_join(exp_cols, by = "barcode") %>% 
+    column_to_rownames("barcode") %>% # Rownames to cols
+ mutate(across(-paper_BRCA_Subtype_PAM50, ~ as.numeric(as.character(.)))) %>%
+    nacol_rm(p=0.5) %>% 
+  na.omit()
+
+multi_data$paper_BRCA_Subtype_PAM50 <- factor(multi_data$paper_BRCA_Subtype_PAM50, levels = c(unique(multi_data$paper_BRCA_Subtype_PAM50)))
+trainIndex <- createDataPartition(multi_data$paper_BRCA_Subtype_PAM50,
+                                  p = 0.7, list = FALSE)
+
+train_data <- multi_data[trainIndex, ]
+test_data  <- multi_data[-trainIndex, ]
+
+model_rf <- randomForest(paper_BRCA_Subtype_PAM50 ~ ., data = train_data, importance = TRUE, ntree = 500, step="backward")
+
+varImpPlot(model_rf, main = "Feature Importance")
+
+# Predict
+pred_rf <- predict(model_rf, test_data)
+confusionMatrix(pred_rf, test_data$paper_BRCA_Subtype_PAM50)
+
+
+```
+
+kNN - Multi class:
+
+```{r}
+
+model_knn <- train(
+  paper_BRCA_Subtype_PAM50 ~ .,
+  data = train_data,
+  method = "knn",
+  tuneGrid = expand.grid(k = seq(3, 31, by = 2)),  # Explore wider range (not 1-10)
+  trControl = trainControl(
+    method = "cv", 
+    number = 5, 
+    classProbs = TRUE,
+    summaryFunction = multiClassSummary  # Use for multiclass, not default
+  ),
+  preProcess = c("center", "scale"),  # Essential for distance-based method
+  metric = "Balanced_Accuracy"  # Better than Accuracy for imbalanced multiclass
+)
+
+# Predict
+pred_knn <- predict(model_knn, test_data)
+confusionMatrix(pred_knn, test_data$paper_BRCA_Subtype_PAM50)
+
+```
+
+Multinomial logistic regression:
+
+```{r}
+model_multinom <- train(paper_BRCA_Subtype_PAM50 ~ ., 
+                        data = train_data, 
+                        method = "multinom",
+                        trace = FALSE,
+                        trControl = trainControl(method = "cv", number = 5))
+
+# Predict
+pred_multinom <- predict(model_multinom, test_data)
+confusionMatrix(pred_multinom, test_data$paper_BRCA_Subtype_PAM50)
+```
 
 ### For each model, report: accuracy, F1, per-class precision/recall.
+
 ```{r}
 library(dplyr)
 library(tibble)
@@ -852,6 +1037,7 @@ lines(roc_knn, col="red", lwd=2)
 legend("bottomright", legend=c("Logistic","Random Forest","k-NN"),
        col=c("blue","green","red"), lwd=2)
 ```
+
 ```{r}
 rocs <- c(auc(roc_logit),auc(roc_knn),auc(roc_rf))
 tibble(models=c("Logistic Regression", "k-Nearest Neighbors", "Random Forest"),
@@ -876,6 +1062,7 @@ tibble(models=c("Logistic Regression", "k-Nearest Neighbors", "Random Forest"),
 ### anot_clean \<- brca_anot_clean[, c("barcode", grep("\^paper\_", names(brca_anot_clean), value = TRUE))]
 
 ### How many paper\_ columns are retained? What categories of information do they cover?
+
 ```{r}
 # Count the number of paper_ columns
 num_paper_cols <- ncol(anot_paper) - 1
@@ -886,6 +1073,7 @@ colnames(anot_paper)
 ```
 
 ### Are there samples with missing subtype assignments? How should these be handled?
+
 ```{r}
 # Check for missing values in the subtype column
 table(anot_paper$paper_BRCA_Subtype_PAM50, useNA = "ifany")
@@ -893,7 +1081,6 @@ table(anot_paper$paper_BRCA_Subtype_PAM50, useNA = "ifany")
 # Or count NAs directly
 sum(is.na(anot_paper$paper_BRCA_Subtype_PAM50))
 ```
-
 
 ## Step B — Clinical Variable Exploration
 
@@ -918,8 +1105,8 @@ print(table(anot_paper$paper_BRCA_Pathology, useNA = "ifany"))
 
 ```
 
-
 ### Tabulate paper_vital_status and compute median follow-up time.
+
 ```{r}
 cat("--- Vital Status ---")
 print(table(anot_paper$paper_vital_status, useNA = "ifany"))
@@ -927,7 +1114,9 @@ print(table(anot_paper$paper_vital_status, useNA = "ifany"))
 median_followup_days <- median(anot_paper$paper_days_to_last_followup, na.rm = TRUE)
 print(median_followup_days)
 ```
+
 ### Examine multi-omic cluster columns (paper_CNV.Clusters, paper_mRNA.Clusters, paper_Protein.Clusters) — how do they relate to PAM50?
+
 ```{r}
 cat("--- mRNA Clusters vs PAM50 ---\n")
 print(table(Cluster = anot_paper$paper_mRNA.Clusters, PAM50 = anot_paper$paper_BRCA_Subtype_PAM50))
@@ -941,14 +1130,15 @@ cat("--- Protein Clusters vs PAM50 ---\n")
 print(table(Cluster = anot_paper$paper_Protein.Clusters, PAM50 = anot_paper$paper_BRCA_Subtype_PAM50))
 cat("\n")
 ```
- 
+
 ## Step C — Clinical Feature Classification
 
 ### Predict a binary or multi-class clinical outcome using clinical variables only (no expression data).
 
 ### Define the outcome variable and apply appropriate encoding.
 
-We define vital status as outcome variable (predicting whether a patient is 'Alive' or 'Dead' based on their clinical profile)
+We define vital status as outcome variable (predicting whether a patient
+is 'Alive' or 'Dead' based on their clinical profile)
 
 ### Select a small set of meaningful features (age, stage, grade, subtype, etc.) and handle missing values by imputation or exclusion.
 
@@ -996,8 +1186,8 @@ print(rf_model)
 print(knn_model)
 ```
 
-
 ### Report confusion matrices, accuracy, sensitivity/specificity, and AUC-ROC for each model.
+
 ```{r}
 
 set.seed(42) 
@@ -1019,6 +1209,7 @@ cat("\n--- k-NN Confusion Matrix ---\n")
 confusionMatrix(pred_knn_class, test_data$Target)
               
 ```
+
 ```{r}
 
 set.seed(42) 
@@ -1048,9 +1239,8 @@ legend("bottomright", legend = c("Logistic Regression", "Random Forest", "k-NN")
        col = c("blue", "green", "red"), lwd = 2)
 ```
 
-
-
 ### Identify the most predictive clinical features: variable importance from RF, and coefficients from Logistic Regression. Note that k-NN does not provide native feature importance.
+
 ```{r}
 set.seed(42) 
 # Random Forest Variable Importance Plot
@@ -1066,7 +1256,6 @@ summary(lr_model$finalModel)
 lr_importance <- varImp(lr_model, scale = FALSE)
 plot(lr_importance, main = "Logistic Regression Feature Importance")
 ```
-
 
 ## Step D — Integrative Analysis (Expression + Clinical)
 
