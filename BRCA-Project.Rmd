@@ -93,7 +93,7 @@ data.frame("Valid_PAM50_subtypes" = valid_target_samples, "NA" = length(anot_pap
 
 ```
 
-## significant breast cancer genes from the paper:
+## significant breast cancer genes from the paper (genes with the most consistant ):
 
 PIK3CA, PTEN, AKT1, TP53, GATA3, CDH1, RB1, MLL3, MAP3K1, CDKN1B, TBX3,
 RUNX1, CBFB, AFF2, PIK3R1, PTPN22, PTPRD, NF1, SF3B1 and CCND3
@@ -101,6 +101,12 @@ RUNX1, CBFB, AFF2, PIK3R1, PTPN22, PTPRD, NF1, SF3B1 and CCND3
 ## How many annotation columns are retained after cleaning to paper\_ columns?
 
 ```{r}
+
+paper_top_genes <- c("PIK3CA", "PTEN", "AKT1", "TP53", "GATA3", "CDH1", "RB1", "MLL3", "MAP3K1", "CDKN1B", "TBX3", "RUNX1", "CBFB", "AFF2", "PIK3R1", "PTPN22", "PTPRD", "NF1", "SF3B1", "CCND3", "MDM2")
+
+interesting_genes <- brca_exp_clean %>% filter(gene %in% paper_top_genes)
+
+
 
 #---------------------Not Needed-------------------
 
@@ -150,6 +156,11 @@ gene_variability <- brca_exp_clean %>%
 top5_variable <- head(gene_variability, 5)
 cat("Top 5 Most Variable Genes:\n")
 print(top5_variable)
+
+top_20_most_variable <- head(gene_variability, 20)
+
+# checking if the interesting genes are found in the top variable genes 
+top_20_most_variable %>% filter(gene %in% interesting_genes) # nope
 
 # Bottom 5 least variable
 bottom5_variable <- tail(gene_variability, 5)
@@ -552,6 +563,7 @@ de_results <- do.call(rbind, lapply(subtypes, wilcoxon_one_vs_rest))
 
 ```
 
+
 ### Apply FDR correction (BH). Report the top 20 genes per subtype by adjusted p-value and log2 fold-change.
 
 We have executed 14970 tests. That leads to many random false-positives.
@@ -579,7 +591,11 @@ top20 <- de_results %>%
   arrange(p_adj, desc(abs(log2FC))) %>% # adds expression data
   slice_head(n=20) %>% 
   ungroup() #undos the group_by(subtype)
-top20
+View(top20)
+top20$gene
+## seeing if the interesting genes in the paper are in the top 20 DEGs
+
+top20 %>% filter(gene %in% interesting_genes) # nope 
 
 ```
 
@@ -588,8 +604,8 @@ top20
 # Arijaan:
 # heatmap with the adjusted p-values. change p_adj to log2fc for the expression.
 heatmap_data <- top20 %>%
-  select(gene, subtype, p_adj) %>%
-  pivot_wider(names_from = subtype, values_from = p_adj)
+  select(gene, subtype, log2FC) %>%
+  pivot_wider(names_from = subtype, values_from = log2FC)
 
 # 2. Convert to a true numeric matrix with gene names as row names
 heatmap_matrix <- as.matrix(heatmap_data[, -1])
@@ -611,6 +627,8 @@ pheatmap(
   display_numbers = FALSE,     # Set to TRUE if you want text values inside the cells
   main = "Differential Gene Expression (p_adj) per Subtype"
 )
+
+
 ```
 
 ### Generate an annotated heatmap (rows = top DEGs, columns = samples, annotation bars = PAM50 subtype and pathologic stage).
@@ -642,7 +660,6 @@ col_annot_sorted <- col_annotation[col_order, , drop = FALSE]
 pheatmap(
   heatmap_z_sorted,
   annotation_col = col_annot_sorted,
-  annotation_colors = list(PAM50 = pam50_colors, Stage = stage_palette),
   show_rownames = TRUE, #show gene names
   show_colnames = FALSE,
   cluster_cols = FALSE, #dont cluster columns again since they are already sorted
@@ -666,24 +683,9 @@ too_many_nas <- colSums(is.na(df)) > round(nrow(df)*p)
 bad_column_names <- colnames(df)[too_many_nas]
 df <- df[, !too_many_nas]
 }
-
-# ---------alternative to the function: (delete if the function works) -----
-
-
-#nacol_rm <- function(df, p){
-#  names <- c()
-#  valid_colnames <- sapply(1:ncol(df), function(i){
-#  ifelse(sum(is.na(df[,i])) > round(nrow(df)*p), NA,
-#         names[i]<-colnames(df[,i])
-#    )
-#   }
-#  )
-
-
-#valid_colnames <- na.omit(valid_colnames)
-#df[,valid_colnames]
-#}
 ```
+
+
 
 ### Binary task — tumor vs. normal: Logistic Regression, Random Forest, k-NN. Report confusion matrices and AUC-ROC.
 
@@ -746,6 +748,7 @@ binary_data$paper_BRCA_Subtype_PAM50 <- factor(binary_data$paper_BRCA_Subtype_PA
 #olevels <- lapply(1:length(colnames(binary_data)),function(x){levels(binary_data[,x])})
 ```
 
+
 ```{r}
 
 # -----------------Using caret to create the test and training data------------
@@ -763,7 +766,7 @@ test_data  <- binary_data[-trainIndex, ]
 # Creating the model using the glm function from the stats library while using the binomial family to specify the type as a logistic regression. 
 
 model_logit <- glm(paper_BRCA_Subtype_PAM50 ~ ., data = train_data, family = "binomial")
-
+?glm
 summary(model_logit)
 
 # Predict
@@ -819,9 +822,6 @@ model_knn <- train(
   metric = "ROC"  # Better than Accuracy for class imbalance (lots more tumor)
 )
 
-# Plot k tuning
-plot(model_knn)
-
 # Predict directly on test_data (no need for test_norm)
 pred_knn <- predict(model_knn, test_data)
 confusionMatrix(pred_knn, test_data$paper_BRCA_Subtype_PAM50)
@@ -829,11 +829,8 @@ confusionMatrix(pred_knn, test_data$paper_BRCA_Subtype_PAM50)
 
 ```{r}
 # Plot k selection
-ggplot(model_knn$results, aes(x = k, y = Accuracy)) +
-  geom_line(col="red3") +
-  geom_point() +
-  labs(title = "k-NN Accuracy vs. Number of Neighbors") +
-  theme_minimal()
+
+plot(model_knn)
 ```
 
 #### Random forest
@@ -842,15 +839,29 @@ ggplot(model_knn$results, aes(x = k, y = Accuracy)) +
 # Fit the random forest model
 # Using caret to create the test and training data
 
-model_rf <- randomForest(paper_BRCA_Subtype_PAM50 ~ ., data = train_data, importance = TRUE, ntree = 500)
-
-# Feature importance plot
-varImpPlot(model_rf, main = "Feature Importance")
+model_rf <- randomForest(paper_BRCA_Subtype_PAM50 ~ ., data = train_data, importance = TRUE, ntree = 500, step="backward") #
 
 # Predict
 pred_rf <- predict(model_rf, test_data)
 confusionMatrix(pred_rf, test_data$paper_BRCA_Subtype_PAM50)
 ```
+
+```{r}
+# Finding out Important features
+imp_params <- varImp(model_rf, main = "Feature Importance")
+
+# saving the values and the genes in a dataframe for possible comparison with other models
+rf_varimp <- tibble("important parameters"=rownames(imp_params[23:33, ]), 
+       imp_params[23:33, 1])
+
+# plotting out the 1o most important parameters
+varImpPlot(model_rf, main = "Feature Importance", n.var = 10)
+
+
+
+```
+
+### Binary class summary:
 
 Binary classification doesn't work at all since the normal subtype is
 not easily found among the other PAM50 subtypes. This makes the model
@@ -1029,11 +1040,11 @@ p_rf <- predict(model_rf, newdata = test_data, type = "prob")[, "tumor"]
 
 roc_logit <- roc(truth, p_logit, levels = c("tumor", "Normal"))
 roc_rf    <- roc(truth, p_rf,    levels = c("tumor", "Normal"))
-roc_knn   <- roc(truth, p_knn,   levels = c("tumor", "Normal"))
+#roc_knn   <- roc(truth, p_knn,   levels = c("tumor", "Normal"))
 
 plot(roc_logit, col="blue", main="ROC Curves", lwd=2)
 lines(roc_rf, col="green", lwd=2)
-lines(roc_knn, col="red", lwd=2)
+#lines(roc_knn, col="red", lwd=2)
 legend("bottomright", legend=c("Logistic","Random Forest","k-NN"),
        col=c("blue","green","red"), lwd=2)
 ```
@@ -1050,6 +1061,12 @@ tibble(models=c("Logistic Regression", "k-Nearest Neighbors", "Random Forest"),
 ## Step 8 — Method Comparison
 
 ### Compare model performance systematically in a summary table.
+
+```{r}
+
+
+
+```
 
 ### Evaluate whether the top DEGs (Step 6) rank highly as predictive features (Step 7 feature importance). Overlap analysis with UpSet plot or Venn diagram.
 
