@@ -116,7 +116,7 @@ cat("Number of paper_ columns retained:", num_paper_cols, "\n")
 
 ```{r}
 
-set.seed(161) # For reproducibility
+set.seed(42) # For reproducibility
 random_exp <- brca_exp_clean %>% slice_sample(n=10) # Subsetting the matrix to keep randomly selected genes
 random_exp_long <- random_exp %>%
   pivot_longer(cols = where(is.numeric), 
@@ -170,7 +170,7 @@ ggplot(var_exp, aes(x = reorder(gene, Expression, FUN = median),
                     y = Expression, 
                     fill = Variability)) +
   geom_boxplot(outlier.size = 0.5) +
-  scale_fill_manual(values = c("High" = "#E74C3C", "Low" = "#3498DB")) +
+  scale_fill_manual(values = c("High" = "red", "Low" = "blue")) +
   labs(title = "Expression Distribution: High vs Low Variability Genes",
        subtitle = "Top 5 and Bottom 5 genes by standard deviation",
        x = "Gene",
