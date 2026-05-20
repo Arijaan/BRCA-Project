@@ -300,7 +300,8 @@ pheatmap::pheatmap(
   color = colorRampPalette(c("blue","white","red"))(100),
   main = "Pairwise Pearson Correlation",
   treeheight_row = 30,
-  treeheight_col = 30
+  treeheight_col = 30,
+  fontsize = 5
 )
 
 highly_correlated_genes
@@ -339,7 +340,7 @@ pheatmap(
   annotation_colors = list(PAM50 = pam50_colors),
   show_rownames = FALSE,
   show_colnames = FALSE,
-  color = colorRampPalette(c("white","orange","darkred"))(100),
+  color = colorRampPalette(c("navy","white","red"))(100),
   main = "Pairwise Pearson Correlation",
   treeheight_row = 30,
   treeheight_col = 30
@@ -388,6 +389,10 @@ genuinely distinct transcriptional states, not arbitrary labels.
 ## Step 4 — Hierarchical Clustering
 
 ### Cluster samples using hclust.
+
+Here we tried both the silhouette method and the elbow method for finding the optimal `k` value for clustering. The elbow method did not yield any readable results as it lacked the essential "elbow". We therefore do not present its results. The average silhouette score was also not desirable, but the highest was achieved with two centroids. 
+
+This problem with the clustering is because of the data not being heterogenous enough or there not being enough data points generally.
 
 ```{r step4-clustering-and-silhouette, fig.width=10, fig.height=6}
 
@@ -471,7 +476,7 @@ library(tibble)
 # The simplest, safest pipeline:
 pca_result <- exp_t %>% 
   prcomp(center = TRUE, scale = FALSE)
-summary(pca_result)
+
 ```
 
 ### Plot PC1 vs. PC2 and PC1 vs. PC3, colored by PAM50 subtype and by hierarchical cluster.
@@ -560,14 +565,13 @@ do.call(rbind, results)
 #lapply tales test_subtype for each of the 5 subtypes, the result is a list of 5 data frames with each having 2994 rows. do.call glues them together again resulting in a dataframe of 14970 rows
 de_results <- do.call(rbind, lapply(subtypes, wilcoxon_one_vs_rest))
 
-
 ```
 
 
 ### Apply FDR correction (BH). Report the top 20 genes per subtype by adjusted p-value and log2 fold-change.
 
 We have executed 14970 tests. That leads to many random false-positives.
-p.adjust(method = "B") corrects p-values using the Benjamini-Hochberg
+p.adjust(method = "BH") corrects p-values using the Benjamini-Hochberg
 method. group_by(subtype) ensures a seperate correction by subtype and
 mutate adds the corrected p-values as a new column p_adj
 
@@ -580,7 +584,7 @@ de_results <- de_results %>%
 
 Top report the top 20 genes per subtype by adjusted p-value and log2
 fold-change we first sort by smalles p_adj (most significant first) and
-if p_adj valuea are eequal then sort by highest absolute log2FC
+if p_adj valuea are equal then sort by highest absolute log2FC
 (strongest effect first). slice_head(n=20) only keeps the top 20 genes
 per subtype. abs() is used because we want both up- and downregulated
 genes.
@@ -591,8 +595,7 @@ top20 <- de_results %>%
   arrange(p_adj, desc(abs(log2FC))) %>% # adds expression data
   slice_head(n=20) %>% 
   ungroup() #undos the group_by(subtype)
-View(top20)
-top20$gene
+
 ## seeing if the interesting genes in the paper are in the top 20 DEGs
 
 top20 %>% filter(gene %in% interesting_genes) # nope 
@@ -699,7 +702,8 @@ subtypes according to the PCA.
 
 For binary analysis of the data, we need to annotate the subtypes
 properly, so that we have either a "normal" or a "tumor". For this, we
-can use `dplyr`:
+can use `dplyr`.
+Afterwards, the data is cleaned and prepared for machine learning. All categorical data, with the exceptiopn of `PAM50subtypes`, are made into numeric and NAs are omitted. `PAM50subtypes` is also saved as a factor with two levels: `tumor` and `Normal`Additionally, the top 30 genes with the most sd (which are believed to be highly variable) are aligned with the samples to have more parameters for the training.
 
 ```{r}
 
@@ -748,7 +752,7 @@ binary_data$paper_BRCA_Subtype_PAM50 <- factor(binary_data$paper_BRCA_Subtype_PA
 #olevels <- lapply(1:length(colnames(binary_data)),function(x){levels(binary_data[,x])})
 ```
 
-
+We use `caret` to create 70/30 training and testing datasets. 
 ```{r}
 
 # -----------------Using caret to create the test and training data------------
@@ -761,12 +765,13 @@ test_data  <- binary_data[-trainIndex, ]
 
 ```
 
+Starting with a logistic regression model, we use the `glm` function from `stats` while using the binomial family to specify the type as a logistic regression. we check the final results using the `summary` function. For generating a cross-tabulation table, first the prediction is made on the test data. Subsequently, the result of the prediction is in probabilities and needs to be turned back into the factor values. After this step is cross-tabulation table can be generate.
 ```{r Logistic regression}
 
 # Creating the model using the glm function from the stats library while using the binomial family to specify the type as a logistic regression. 
 
 model_logit <- glm(paper_BRCA_Subtype_PAM50 ~ ., data = train_data, family = "binomial")
-?glm
+
 summary(model_logit)
 
 # Predict
@@ -831,7 +836,11 @@ confusionMatrix(pred_knn, test_data$paper_BRCA_Subtype_PAM50)
 # Plot k selection
 
 plot(model_knn)
+
+model_knn$bestTune[,"k"] # optimal k
 ```
+We see that the optimal k is 13, meaning 13 neighbors for each data point.
+
 
 #### Random forest
 
@@ -858,6 +867,109 @@ rf_varimp <- tibble("important parameters"=rownames(imp_params[23:33, ]),
 varImpPlot(model_rf, main = "Feature Importance", n.var = 10)
 
 
+
+```
+```{r}
+library(dplyr)
+library(tibble)
+test_bin  <- test_data
+truth_bin <- test_bin$paper_BRCA_Subtype_PAM50
+
+# --- Helper: Vectorized metrics calculation ---
+metrics_from_preds <- function(pred, truth) {
+  # Align factor levels safely
+  lvls <- union(levels(as.factor(truth)), levels(as.factor(pred)))
+  truth_binary <- factor(truth, levels = lvls)
+  pred  <- factor(pred, levels = lvls)
+  
+  # Build confusion matrix
+  tab <- table(Prediction = pred, Reference = truth_binary)
+  
+  # Vectorized extraction
+  tp <- diag(tab)
+  fp <- rowSums(tab) - tp
+  fn <- colSums(tab) - tp
+  support <- colSums(tab)
+  
+  # Vectorized metric math 
+  precision <- tp / (tp + fp)
+  recall    <- tp / (tp + fn)
+  f1        <- 2 * precision * recall / (precision + recall)
+  
+  # Convert NaNs to NAs
+  precision[is.nan(precision)] <- NA_real_
+  recall[is.nan(recall)]       <- NA_real_
+  f1[is.nan(f1)]               <- NA_real_
+  
+  # Build output tables
+  per_class <- tibble(
+    Class     = colnames(tab),
+    Support   = as.integer(support),
+    Precision = as.numeric(precision),
+    Recall    = as.numeric(recall),
+    F1        = as.numeric(f1)
+  )
+  
+  overall <- tibble(
+    Accuracy   = sum(tp) / sum(tab),
+    MacroF1    = mean(f1, na.rm = TRUE),
+    WeightedF1 = sum(f1 * support, na.rm = TRUE) / sum(support)
+  )
+  
+  list(confusion = tab, overall = overall, per_class = per_class)
+}
+
+test_multi  <- test_data
+truth_multi <- test_multi$paper_BRCA_Subtype_PAM50
+
+# --- Evaluate Models Iteratively ---
+truth <- test_data$paper_BRCA_Subtype_PAM50
+
+models_bin<- list(
+  "Logistic regression" = pred_logit,
+  "k-NN"                = pred_knn,
+  "Random forest"       = pred_rf
+)
+
+# 1. Use base R lapply() instead of purrr::map()
+evaluations <- lapply(models_bin, metrics_from_preds, truth = truth_bin)
+
+conf_tbl <- tibble(
+  Model = names(evaluations),
+  Confusion = lapply(evaluations, `[[`, "confusion")
+)
+
+# To print a specific model nicely:
+conf_tbl$Confusion
+```
+
+```{r}
+
+truth <- droplevels(test_data$paper_BRCA_Subtype_PAM50)
+
+# Logistic: prob_logit is already numeric from glm
+p_logit <- prob_logit  # check: this is P(class == "Normal") if levels are c("tumor","Normal")
+
+# Random forest probs
+p_rf <- predict(model_rf, newdata = test_data, type = "prob")[, "tumor"]
+p_knn <- predict(model_knn, newdata = test_data, type = "prob")[, "tumor"]
+
+
+roc_logit <- roc(truth, p_logit, levels = c("tumor", "Normal"))
+roc_rf    <- roc(truth, p_rf,    levels = c("tumor", "Normal"))
+roc_knn   <- roc(truth, p_knn, levels = c("tumor", "Normal"))
+
+plot(roc_logit, col="blue", main="ROC Curves", lwd=2)
+lines(roc_rf, col="green", lwd=2)
+lines(roc_knn, col="red", lwd=2)
+legend("bottomright", legend=c("Logistic","Random Forest","k-NN"),
+       col=c("blue","green","red"), lwd=2)
+```
+
+```{r}
+rocs <- c(auc(roc_logit),auc(roc_knn),auc(roc_rf))
+tibble(models=c("Logistic Regression", "k-Nearest Neighbors", "Random Forest"),
+       AUC=rocs)
 
 ```
 
@@ -908,6 +1020,7 @@ confusionMatrix(pred_rf, test_data$paper_BRCA_Subtype_PAM50)
 
 
 ```
+Right away, we can see that the multi-class test fits out data better since the model is not only reported to be better than the null model (P < 0.05), but it has a much lower NIR (0.53 instead of 0.96) meaning its taking a lot of fewer guesses and the specificity and sensitivity of the test also returns good values, especially at subtypes: Her2 and Basal but also LumA.
 
 kNN - Multi class:
 
@@ -948,12 +1061,46 @@ pred_multinom <- predict(model_multinom, test_data)
 confusionMatrix(pred_multinom, test_data$paper_BRCA_Subtype_PAM50)
 ```
 
-### For each model, report: accuracy, F1, per-class precision/recall.
 
 ```{r}
-library(dplyr)
-library(tibble)
 
+truth <- droplevels(test_data$paper_BRCA_Subtype_PAM50)
+
+# Logistic: prob_logit is already numeric from glm
+p_logit <- prob_logit  # check: this is P(class == "Normal") if levels are c("tumor","Normal")
+
+# Random forest probs
+p_rf <- predict(model_rf, newdata = test_data, type = "prob")[, "tumor"]
+p_knn <- predict(model_knn, newdata = test_data, type = "prob")[, "tumor"]
+
+
+roc_logit <- roc(truth, p_logit, levels = c("tumor", "Normal"))
+roc_rf    <- roc(truth, p_rf,    levels = c("tumor", "Normal"))
+roc_knn   <- roc(truth, p_knn, levels = c("tumor", "Normal"))
+
+plot(roc_logit, col="blue", main="ROC Curves", lwd=2)
+lines(roc_rf, col="green", lwd=2)
+lines(roc_knn, col="red", lwd=2)
+legend("bottomright", legend=c("Logistic","Random Forest","k-NN"),
+       col=c("blue","green","red"), lwd=2)
+```
+
+```{r}
+rocs <- c(auc(roc_logit),auc(roc_knn),auc(roc_rf))
+tibble(models=c("Logistic Regression", "k-Nearest Neighbors", "Random Forest"),
+       AUC=rocs)
+
+```
+
+### For each model, report: accuracy, F1, per-class precision/recall.
+
+
+
+## Step 8 — Method Comparison
+
+### Compare model performance systematically in a summary table.
+
+```{r}
 # --- Helper: Vectorized metrics calculation ---
 metrics_from_preds <- function(pred, truth) {
   # Align factor levels safely
@@ -998,77 +1145,40 @@ metrics_from_preds <- function(pred, truth) {
   list(confusion = tab, overall = overall, per_class = per_class)
 }
 
+test_multi  <- test_data
+truth_multi <- test_multi$paper_BRCA_Subtype_PAM50
+
+models_multi <- list(
+  "k-NN"          = pred_knn,
+  "Random forest" = pred_rf
+  # add "Multinom" only if you actually created pred_multinom
+)
+
 # --- Evaluate Models Iteratively ---
 truth <- test_data$paper_BRCA_Subtype_PAM50
 
 models <- list(
   "Logistic regression" = pred_logit,
-  "k-NN"                = knn_probs,
+  "k-NN"                = pred_knn,
   "Random forest"       = pred_rf
 )
 
 # 1. Use base R lapply() instead of purrr::map()
 evaluations <- lapply(models, metrics_from_preds, truth = truth)
 
-# --- Consolidate and Print Results ---
-# 2. Extract the nested tables with lapply, then bind them. 
-# bind_rows(.id = "Model") automatically converts the list names into a 'Model' column.
-summary_tbl   <- bind_rows(lapply(evaluations, `[[`, "overall"), .id = "Model")
-per_class_tbl <- bind_rows(lapply(evaluations, `[[`, "per_class"), .id = "Model")
+conf_tbl <- tibble(
+  Model = names(evaluations),
+  Confusion = lapply(evaluations, `[[`, "confusion")
+)
 
-print(summary_tbl)
-print(per_class_tbl)
-
-# 3. Use a standard base R for loop instead of purrr::iwalk()
-cat("\n--- Confusion tables ---\n")
-for (model_name in names(evaluations)) {
-  cat("\nModel:", model_name, "\n")
-  print(evaluations[[model_name]]$confusion)
-}
+# To print a specific model nicely:
+conf_tbl
 ```
 
-```{r}
 
-truth <- droplevels(test_data$paper_BRCA_Subtype_PAM50)
-
-# Logistic: prob_logit is already numeric from glm
-p_logit <- prob_logit  # check: this is P(class == "Normal") if levels are c("tumor","Normal")
-
-# Random forest probs
-p_rf <- predict(model_rf, newdata = test_data, type = "prob")[, "tumor"]
-
-
-roc_logit <- roc(truth, p_logit, levels = c("tumor", "Normal"))
-roc_rf    <- roc(truth, p_rf,    levels = c("tumor", "Normal"))
-#roc_knn   <- roc(truth, p_knn,   levels = c("tumor", "Normal"))
-
-plot(roc_logit, col="blue", main="ROC Curves", lwd=2)
-lines(roc_rf, col="green", lwd=2)
-#lines(roc_knn, col="red", lwd=2)
-legend("bottomright", legend=c("Logistic","Random Forest","k-NN"),
-       col=c("blue","green","red"), lwd=2)
-```
-
-```{r}
-rocs <- c(auc(roc_logit),auc(roc_knn),auc(roc_rf))
-tibble(models=c("Logistic Regression", "k-Nearest Neighbors", "Random Forest"),
-       AUC=rocs)
-
-
-
-```
-
-## Step 8 — Method Comparison
-
-### Compare model performance systematically in a summary table.
-
-```{r}
-
-
-
-```
 
 ### Evaluate whether the top DEGs (Step 6) rank highly as predictive features (Step 7 feature importance). Overlap analysis with UpSet plot or Venn diagram.
+
 
 # Part II — Clinical Data Analysis
 
@@ -1278,11 +1388,172 @@ plot(lr_importance, main = "Logistic Regression Feature Importance")
 
 ### Correlate top DEGs from Part I with continuous clinical variables (e.g., age) using Spearman's rho.
 
+```{r}
+stepD_genes <- unique(top20$gene)
+stepD_genes <- intersect(stepD_genes, rownames(expr_clean))
+
+stepD_samples <- intersect(colnames(expr_clean), anot_clean$barcode)
+stepD_expr <- as.data.frame(t(expr_clean[stepD_genes, stepD_samples, drop = FALSE]))
+stepD_expr$barcode <- rownames(stepD_expr)
+
+stepD_clin <- anot_clean %>%
+  select(
+    barcode,
+    paper_age_at_initial_pathologic_diagnosis,
+    paper_pathologic_stage,
+    paper_vital_status,
+    paper_BRCA_Subtype_PAM50
+  ) %>%
+  filter(barcode %in% stepD_samples)
+
+stepD_df <- inner_join(stepD_clin, stepD_expr, by = "barcode")
+
+age_corr_tbl <- lapply(stepD_genes, function(gene) {
+  x <- stepD_df[[gene]]
+  y <- stepD_df$paper_age_at_initial_pathologic_diagnosis
+  ok <- !is.na(x) & !is.na(y)
+  if (sum(ok) < 3) {
+    return(tibble(gene = gene, rho = NA_real_, p_value = NA_real_))
+  }
+  ct <- suppressWarnings(cor.test(x[ok], y[ok], method = "spearman"))
+  tibble(gene = gene, rho = unname(ct$estimate), p_value = ct$p.value)
+}) %>%
+  bind_rows() %>%
+  arrange(p_value)
+
+age_corr_tbl %>% slice_head(n = 10)
+```
+
+
 ### Test whether top DEGs differ significantly across clinical stages.
+
+```{r}
+stage_diff_tbl <- lapply(stepD_genes, function(gene) {
+  x <- stepD_df[[gene]]
+  grp <- stepD_df$paper_pathologic_stage
+  ok <- !is.na(x) & !is.na(grp)
+  if (length(unique(grp[ok])) < 2) {
+    return(tibble(gene = gene, p_value = NA_real_))
+  }
+  kt <- suppressWarnings(kruskal.test(x[ok] ~ grp[ok]))
+  tibble(gene = gene, p_value = kt$p.value)
+}) %>%
+  bind_rows() %>%
+  arrange(p_value)
+
+stage_diff_tbl %>% slice_head(n = 10)
+```
 
 ### Build a multimodal classifier: combine top expression features (from Step 7 / RF importance) with key clinical features. Does adding clinical data improve performance?
 
+```{r}
+stepD_top_expr <- age_corr_tbl %>%
+  filter(!is.na(p_value)) %>%
+  arrange(p_value) %>%
+  slice_head(n = 10) %>%
+  pull(gene)
+
+stepD_model_df <- stepD_df %>%
+  select(
+    barcode,
+    paper_vital_status,
+    paper_age_at_initial_pathologic_diagnosis,
+    paper_pathologic_stage,
+    paper_BRCA_Subtype_PAM50,
+    all_of(stepD_top_expr)
+  ) %>%
+  drop_na() %>%
+  mutate(
+    Target = factor(paper_vital_status, levels = c("Alive", "Dead")),
+    Age = paper_age_at_initial_pathologic_diagnosis,
+    Stage = as.factor(paper_pathologic_stage),
+    PAM50 = as.factor(paper_BRCA_Subtype_PAM50)
+  ) %>%
+  select(Target, Age, Stage, PAM50, all_of(stepD_top_expr))
+
+set.seed(42)
+stepD_idx <- createDataPartition(stepD_model_df$Target, p = 0.7, list = FALSE)
+stepD_train <- stepD_model_df[stepD_idx, ]
+stepD_test  <- stepD_model_df[-stepD_idx, ]
+
+stepD_ctrl <- trainControl(
+  method = "cv",
+  number = 5,
+  classProbs = TRUE,
+  summaryFunction = twoClassSummary
+)
+
+rf_clin <- train(
+  Target ~ Age + Stage + PAM50,
+  data = stepD_train,
+  method = "rf",
+  trControl = stepD_ctrl,
+  metric = "ROC"
+)
+
+rf_multi <- train(
+  Target ~ .,
+  data = stepD_train,
+  method = "rf",
+  trControl = stepD_ctrl,
+  metric = "ROC"
+)
+
+prob_clin <- predict(rf_clin, newdata = stepD_test, type = "prob")[, "Alive"]
+prob_multi <- predict(rf_multi, newdata = stepD_test, type = "prob")[, "Alive"]
+
+roc_clin <- roc(stepD_test$Target, prob_clin, levels = c("Alive", "Dead"))
+roc_multi <- roc(stepD_test$Target, prob_multi, levels = c("Alive", "Dead"))
+
+tibble(
+  Model = c("Clinical only", "Expression + clinical"),
+  AUC = c(auc(roc_clin), auc(roc_multi))
+)
+```
+
+
 ### Visualize: boxplots of top expression features stratified by clinical subgroups; annotated heatmap with both molecular and clinical annotation bars.
+
+```{r}
+plot_genes <- head(stepD_top_expr, 4)
+
+box_df <- stepD_df %>%
+  select(paper_pathologic_stage, paper_vital_status, all_of(plot_genes)) %>%
+  pivot_longer(cols = all_of(plot_genes), names_to = "Gene", values_to = "Expression")
+
+ggplot(box_df, aes(x = paper_pathologic_stage, y = Expression, fill = paper_pathologic_stage)) +
+  geom_boxplot(outlier.size = 0.5) +
+  facet_wrap(~ Gene, scales = "free_y") +
+  theme_minimal() +
+  labs(
+    title = "Top DEG expression by clinical stage",
+    x = "Pathologic stage",
+    y = "Expression"
+  )
+
+heat_genes <- head(stepD_top_expr, 10)
+heat_mat <- as.matrix(expr_clean[heat_genes, stepD_samples, drop = FALSE])
+storage.mode(heat_mat) <- "numeric"
+heat_z <- t(scale(t(heat_mat)))
+
+heat_annot <- stepD_clin %>%
+  filter(barcode %in% colnames(heat_z)) %>%
+  select(barcode, paper_BRCA_Subtype_PAM50, paper_pathologic_stage, paper_vital_status) %>%
+  mutate(across(everything(), as.factor)) %>%
+  as.data.frame()
+rownames(heat_annot) <- heat_annot$barcode
+heat_annot$barcode <- NULL
+heat_annot <- heat_annot[colnames(heat_z), , drop = FALSE]
+
+pheatmap(
+  heat_z,
+  annotation_col = heat_annot,
+  show_colnames = FALSE,
+  fontsize_row = 6,
+  main = "Top expression features with clinical annotations"
+)
+```
+
 
 ### 
 
