@@ -2007,34 +2007,111 @@ In Part 2, where we are investigating the "Alive" or "Dead" data, Age is, expect
 
 ### What biological mechanisms might explain the top DEGs found between clinical subgroups?
 
+The top Differentially Expressed Genes (DEGs) between clinical stages
+(MKI67, BIRC5, TPX2, RRM2, CENPF) are driven by severe cell cycle
+dysregulation. As tumors progress, they bypass natural checkpoints and
+dedicate their machinery to aggressive expansion.
+
+MKI67 for example encodes Ki-67, the universal marker for active cell
+division, indicating a high percentage of the tumor is actively
+proliferating (Scholzen & Gerdes, 2000). To fuel this rapid growth, the
+tumor upregulates RRM2, an enzyme that mass-produces the raw nucleotide
+building blocks required for rapid DNA synthesis (Aye et al., 2015).
+
+Advanced tumors accumulate severe DNA damage that would normally trigger
+apoptosis. However, the overexpression of BIRC5 produces Survivin, a
+protein that blocks these apoptotic pathways. This effectively
+"immortalizes" the cancer cells, allowing them to survive rampant damage
+and resist external therapies (Altieri, 2003).
+
+Other than that, the significant upregulation of TPX2 and CENPF ensures
+the efficient assembly of the mitotic spindle, driving continuous cell
+division (Neumayer et al., 2014; Sun et al., 2016).
+
+
+
 ### What are the limitations of the TCGA cohort for clinical prediction (sample size per stage, selection of academic-centre patients, etc.)?
 For the outcome variable, chosen in step C. The data is too skewed
 
+Major genomic repositories like TCGA suffer from demographic and
+socioeconomic selection biases, predominantly representing White
+patients treated at well-resourced U.S. academic centers (Spratt et al.,
+2016; Bera et al., 2022). Consequently, predictive models trained
+exclusively on this data risk learning institutional-specific baselines,
+which severely limits their generalizability and clinical safety in
+diverse community settings (Wong et al., 2021).
+
+Furthermore, TCGA data exhibits severe clinical imbalances that hinder
+machine learning. The cohort is heavily skewed toward Stage II tumors
+and "Alive" outcomes. This lack of terminal events introduces a severe
+class imbalance, preventing models from reliably predicting poor
+clinical outcomes.
+
+
 ## References:
 
-1.  [The hnRNP family: insights into their role in health and disease -
-    PMC](https://pmc.ncbi.nlm.nih.gov/articles/PMC4947485/)
 
-2.  [Significance, detection and markers of disseminated breast cancer
-    cells - PubMed](https://pubmed.ncbi.nlm.nih.gov/17158753/)
-
-3.  [Expression analysis of mammaglobin A (SCGB2A2) and lipophilin B
+1.  **Altieri, D. C. (2003).** Survivin, versatile modulation of cell
+    division and apoptosis in cancer. *Oncogene*, 22(53), 8581–8589.
+2.  **Altieri, D. C. (2008).** Survivin, cancer networks and
+    pathway-directed drug discovery. *Nature Reviews Cancer*, 8(1),
+    61–70.
+3.  **Aye, Y., et al. (2015).** Ribonucleotide reductase and cancer:
+    biological mechanisms and targeted therapies. *Oncogene*, 34(16),
+    2011–2021.
+4.  **Bera, K., et al. (2022).** Bias and class imbalance in oncologic
+    data—Towards inclusive and transferrable AI in large scale oncology
+    data sets. *Cancers*, 14(21), 5332.
+5.  **Cancer Genome Atlas Network. (2012).** Comprehensive molecular
+    portraits of human breast tumours. *Nature*, 490(7418), 61–70.
+6.  **Dowsett, M., et al. (2011).** Assessment of Ki67 in breast cancer:
+    recommendations from the International Ki67 in Breast Cancer working
+    group. *Journal of the National Cancer Institute*, 103(22),
+    1656–1664.
+7.  **Geuens, T., Bouhy, D., & Timmerman, V. (2016).** The hnRNP family:
+    insights into their role in health and disease. *Human Genetics*,
+    135(8), 851–867.
+8.  **Ivanov, S. V., et al. (2013).** SOX10 is a novel marker of
+    basal-like and triple-negative breast cancer. *British Journal of
+    Cancer*, 109, 2192–2200.
+9.  **Jenkins, E. O., Deal, A. M., Anders, C. K., Prat, A., Perou, C.
+    M., Carey, L. A., & Muss, H. B. (2014).** Age-specific changes in
+    intrinsic breast cancer subtypes: a focus on older women. *The
+    Oncologist*, 19(10), 1076–1083.
+10. **Kvamme, A. B., Hugaas, U., et al. (2024).** Low tumoral Trefoil
+    Factor 1 expression relates to aggressive tumor features and poor
+    survival in young women with breast cancer. *Scientific Reports*,
+    14, 2195.
+11. **Lacroix, M. (2006).** Significance, detection and markers of
+    disseminated breast cancer cells. *Endocrine-Related Cancer*, 13(4),
+    1033–1067.
+12. **Neumayer, G., et al. (2014).** TPX2: of spindle assembly, DNA
+    damage response, and cancer. *Cellular and Molecular Life Sciences*,
+    71(16), 3027–3047.
+13. **Nielsen, T. O., et al. (2004).** Immunohistochemical and clinical
+    characterization of the basal-like subtype of invasive breast
+    carcinoma. *Clinical Cancer Research*, 10(16), 5367–5374.
+14. **Obacz, J., Brychtova, V., Podhorec, J., et al. (2015).** Anterior
+    gradient protein 3 is associated with less aggressive tumors and
+    better outcome of breast cancer patients. *OncoTargets and Therapy*,
+    8, 1523–1532.
+15. **Scholzen, T., & Gerdes, J. (2000).** The Ki-67 protein: from the
+    known and the unknown. *Journal of Cellular Physiology*, 182(3),
+    311–322.
+16. **Sizemore, S. T., et al. (2014).** Diversity of Basal-like breast
+    cancer. *Cancer Research*, 74(18), 3501.
+17. **Spratt, D. E., et al. (2016).** Racial/ethnic disparities in
+    genomic sequencing. *JAMA Oncology*, 2(8), 1070–1074.
+18. **Sun, J., et al. (2016).** CENPF, a microtubule binding protein,
+    interacts with the kinetochore. *Journal of Biological Chemistry*,
+    291(30).
+19. **Whitfield, M. L., et al. (2006).** Common markers of
+    proliferation. *Nature Reviews Cancer*, 6(2), 99–106.
+20. **Wong, A., et al. (2021).** Generalization in clinical prediction
+    models: the blessing and curse of measurement indicator variables.
+    *Critical Care Medicine*, 49(6), e573–e583.
+21. **Zafrakas, M., Petschke, B., Donner, A., et al. (2006).**
+    Expression analysis of mammaglobin A (SCGB2A2) and lipophilin B
     (SCGB1D2) in more than 300 human tumors and matching normal tissues
-    reveals their co-expression in gynecologic malignancies -
-    PMC](https://pmc.ncbi.nlm.nih.gov/articles/PMC1513245/)
-
-4.  [Comprehensive molecular portraits of human breast tumours \|
-    Nature](https://www.nature.com/articles/nature11412)
-
-5.  [Age-Specific Changes in Intrinsic Breast Cancer Subtypes: A Focus
-    on Older Women -
-    PMC](https://pmc.ncbi.nlm.nih.gov/articles/PMC4200998/)
-
-6.  [Anterior gradient protein 3 is associated with less aggressive
-    tumors and better outcome of breast cancer patients -
-    PMC](https://pmc.ncbi.nlm.nih.gov/articles/PMC4485854/)
-
-7.  [Low tumoral Trefoil Factor 1 expression relates to aggressive tumor
-    features and poor survival in young women with breast cancer -
-    PMC](https://pmc.ncbi.nlm.nih.gov/articles/PMC12891483/)
-    
+    reveals their co-expression in gynecologic malignancies. *BMC
+    Cancer*, 6, 88.
