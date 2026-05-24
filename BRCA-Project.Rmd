@@ -415,7 +415,7 @@ tibble(k = k_values, avg_silhouette = sil_avg)
 km_best <- kmeans(x = exp_t, centers = 2, nstart = 10)
 s_best <- silhouette(km_best$cluster, D)
 plot(s_best, col = "blue", border = NA,
-     main = paste("Silhouette Plot for K-means (k =", best_k, ")"))
+     main = paste("Silhouette Plot for K-means (k = 2)"))
 ```
 
 The average silhouette score was not desirable, but the highest was
@@ -455,15 +455,6 @@ comparison_df <- merge(cluster_df, anot_paper, by = "barcode")
 
 comparison_table <- table(Cluster = comparison_df$hc_cluster, 
                           PAM50 = comparison_df$paper_BRCA_Subtype_PAM50)
-
-
-# --- Comparison for k = 5 ---
-cluster_df_5 <- data.frame(barcode = names(hc_clusters_5), 
-                           hc_cluster = hc_clusters_5)
-
-comparison_df_5 <- merge(cluster_df_5, anot_paper, by = "barcode")
-comparison_table_5 <- table(Cluster = comparison_df_5$hc_cluster, 
-                            PAM50 = comparison_df_5$paper_BRCA_Subtype_PAM50)
 
 print("Cluster Membership vs. PAM50 Subtypes (k=2):")
 print(comparison_table)
@@ -1192,7 +1183,11 @@ pred_knn <- predict(model_knn, test_data)
 confusionMatrix(pred_knn, test_data$paper_BRCA_Subtype_PAM50)
 
 ```
+Also with kNN we see a model better than the null model, With an accuracy of almost 74% and a kappa of 0.52, we see that we have a moderately accurate model. The 53% NIR does however indicate the class imbalance, of which we we aware from the beginning. Moreover, This model also performs similarly on new data according to the 95% CI.
+Looking at the statistics by class, the class imbalance becomes clear, how LumA and Basal make up the majority of the dataset. interestingly, the high prevelance does not increase the specificity of LumA as it does for Basal. This is because the basal subtype differs from the other subtypes in both expression and clinical data. LumA and LumB often get mixed and since LumA has much more datapoints than LumB, most LumB datapoints get falsely assigned to LumA, decreasing LumA's specificity and LumB's sensitivity. 
+Among the other two subtypes with less datapoints, Her2 performs rather well but normal type suffers from its similarity to the other subtypes.   
 
+The high specificity 
 #### Multinomial logistic regression:
 
 this is the equivalent to the logistic regression. it calculates the
@@ -1524,6 +1519,7 @@ No missing PAM50 subtype assignments, so no need to drop samples.
 
 ### Explore paper_pathologic_stage, paper_BRCA_Pathology (IDC vs ILC), paper_age_at_initial_pathologic_diagnosis.
 
+From the clinical data we can look at interesting data like the age of the patients at diagnosis, pathological stage and the BRCA pathological stage. For the aforementioned two, we draw boxplots and the last one is in a table.
 ```{r}
 ## Patholgical Stage
 plot_stage <- anot_paper %>%
@@ -1550,7 +1546,7 @@ stage II BRCA, followed by Stage I and III. Stage IV cases, on the
 orther hand, were rare.
 
 **BRCA Pathology:** Invasise Ductal Carcinoma is by far the dominant
-histological subtype.
+pathological subtype followed by.
 
 ### Tabulate paper_vital_status and compute median follow-up time.
 
@@ -1607,8 +1603,9 @@ is 'Alive' or 'Dead' based on their clinical profile)
 
 ### Select a small set of meaningful features (age, stage, grade, subtype, etc.) and handle missing values by imputation or exclusion.
 
+We select features, drop missing values, and encode categorical data as factors, as we did in part 1 binary:
+
 ```{r}
-# We select features, drop missing values, and encode categorical data as factors
 ml_data <- anot_paper %>%
   select(paper_vital_status, paper_age_at_initial_pathologic_diagnosis, 
          paper_pathologic_stage, paper_BRCA_Subtype_PAM50) %>%
@@ -1625,6 +1622,8 @@ ml_data <- anot_paper %>%
 ```
 
 ### Train/test split (70/30 or 5-fold CV). Fit: Logistic Regression, Random Forest, k-NN.
+
+Again, we use the same commands for training models, except here we used `train` with `method="rf` instead of `randomForest`. Metric is set to ROC for better binary classification using AUC values instead of percentage accuracy.
 
 ```{r}
 ## TRAIN / TEST SPLIT
