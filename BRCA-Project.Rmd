@@ -370,18 +370,17 @@ und streuen über den luminalen Block.
 The heatmap shows a clear **block-diagonal structure** that aligns
 closely with the PAM50 subtype annotation:
 
--   **Basal** samples form the most isolated, highest-contrast block —
-    their expression programme is fundamentally different from all other
-    subtypes. This is consistent with the TCGA paper, which found
-    basal-like tumours to have the most distinct multi-platform
-    signature.
--   **LumA and LumB** share a broad luminal block with high mutual
-    correlation, reflecting their common ER⁺ biology. The differences
-    between them are more quantitative (e.g., proliferation rate) than
-    qualitative.
--   **Her2** sits between the luminal and basal blocks, showing moderate
-    correlation with both.
--   **Normal**-like samples are the most heterogeneous.
+- **Basal** samples form the most isolated, highest-contrast block —
+  their expression programm is fundamentally different from all other
+  subtypes. This is consistent with the TCGA paper, which found
+  basal-like tumours to have the most distinct multi-platform signature.
+- **LumA and LumB** share a broad luminal block with high mutual
+  correlation, reflecting their common ER⁺ biology. The differences
+  between them are more quantitative (e.g., proliferation rate) than
+  qualitative.
+- **Her2** sits between the luminal and basal blocks, showing moderate
+  correlation with both.
+- **Normal**-like samples are the most heterogeneous.
 
 The existence of these sub-blocks confirms that PAM50 subtypes represent
 genuinely distinct transcriptional states, not arbitrary labels.
@@ -390,9 +389,14 @@ genuinely distinct transcriptional states, not arbitrary labels.
 
 ### Cluster samples using hclust.
 
-Here we tried both the silhouette method and the elbow method for finding the optimal `k` value for clustering. The elbow method did not yield any readable results as it lacked the essential "elbow". We therefore do not present its results. The average silhouette score was also not desirable, but the highest was achieved with two centroids. 
+Here we tried both the silhouette method and the elbow method for
+finding the optimal `k` value for clustering. The elbow method did not
+yield any readable results as it lacked the essential "elbow". We
+therefore do not present its results. The average silhouette score was
+also not desirable, but the highest was achieved with two centroids.
 
-This problem with the clustering is because of the data not being heterogenous enough or there not being enough data points generally.
+This problem with the clustering is because of the data not being
+heterogenous enough or there not being enough data points generally.
 
 ```{r step4-clustering-and-silhouette, fig.width=10, fig.height=6}
 
@@ -567,7 +571,6 @@ de_results <- do.call(rbind, lapply(subtypes, wilcoxon_one_vs_rest))
 
 ```
 
-
 ### Apply FDR correction (BH). Report the top 20 genes per subtype by adjusted p-value and log2 fold-change.
 
 We have executed 14970 tests. That leads to many random false-positives.
@@ -639,7 +642,7 @@ pheatmap(
 Annotated heatmap of the Top DEGs (Z-score normalised).
 
 ```{r}
-top_gene_names <- unique(top20$gene) #generates all uniqzue gene names of the top 20 of all subtypes (max 5*20 = 100 genes). 
+top_gene_names <- unique(top20$gene) #generates all unique gene names of the top 20 of all subtypes (max 5*20 = 100 genes). 
 #We cut those genes from the expression matrix and perform a z-score-normalization. Scale() usually normalizes by row, but by column is needed thats why doubled transpontation is needed. After normalization 0 means average expression, +2 means two standardeviations above average. This is important so the colours of the heatmap show relative expression and not the abolute values. Else genes with a high overall expression would dominate the colorprofile
 heatmap_mat     <- as.matrix(expr_clean[top_gene_names,])
 heatmap_z       <- t(scale(t(heatmap_mat)))
@@ -688,8 +691,6 @@ df <- df[, !too_many_nas]
 }
 ```
 
-
-
 ### Binary task — tumor vs. normal: Logistic Regression, Random Forest, k-NN. Report confusion matrices and AUC-ROC.
 
 #### Logistic regression
@@ -702,8 +703,13 @@ subtypes according to the PCA.
 
 For binary analysis of the data, we need to annotate the subtypes
 properly, so that we have either a "normal" or a "tumor". For this, we
-can use `dplyr`.
-Afterwards, the data is cleaned and prepared for machine learning. All categorical data, with the exceptiopn of `PAM50subtypes`, are made into numeric and NAs are omitted. `PAM50subtypes` is also saved as a factor with two levels: `tumor` and `Normal`Additionally, the top 30 genes with the most sd (which are believed to be highly variable) are aligned with the samples to have more parameters for the training.
+can use `dplyr`. Afterwards, the data is cleaned and prepared for
+machine learning. All categorical data, with the exceptiopn of
+`PAM50subtypes`, are made into numeric and NAs are omitted.
+`PAM50subtypes` is also saved as a factor with two levels: `tumor` and
+`Normal`Additionally, the top 30 genes with the most sd (which are
+believed to be highly variable) are aligned with the samples to have
+more parameters for the training.
 
 ```{r}
 
@@ -752,7 +758,8 @@ binary_data$paper_BRCA_Subtype_PAM50 <- factor(binary_data$paper_BRCA_Subtype_PA
 #olevels <- lapply(1:length(colnames(binary_data)),function(x){levels(binary_data[,x])})
 ```
 
-We use `caret` to create 70/30 training and testing datasets. 
+We use `caret` to create 70/30 training and testing datasets.
+
 ```{r}
 
 # -----------------Using caret to create the test and training data------------
@@ -765,7 +772,14 @@ test_data  <- binary_data[-trainIndex, ]
 
 ```
 
-Starting with a logistic regression model, we use the `glm` function from `stats` while using the binomial family to specify the type as a logistic regression. we check the final results using the `summary` function. For generating a cross-tabulation table, first the prediction is made on the test data. Subsequently, the result of the prediction is in probabilities and needs to be turned back into the factor values. After this step is cross-tabulation table can be generate.
+Starting with a logistic regression model, we use the `glm` function
+from `stats` while using the binomial family to specify the type as a
+logistic regression. we check the final results using the `summary`
+function. For generating a cross-tabulation table, first the prediction
+is made on the test data. Subsequently, the result of the prediction is
+in probabilities and needs to be turned back into the factor values.
+After this step is cross-tabulation table can be generate.
+
 ```{r Logistic regression}
 
 # Creating the model using the glm function from the stats library while using the binomial family to specify the type as a logistic regression. 
@@ -839,8 +853,9 @@ plot(model_knn)
 
 model_knn$bestTune[,"k"] # optimal k
 ```
-We see that the optimal k is 13, meaning 13 neighbors for each data point.
 
+We see that the optimal k is 13, meaning 13 neighbors for each data
+point.
 
 #### Random forest
 
@@ -869,6 +884,7 @@ varImpPlot(model_rf, main = "Feature Importance", n.var = 10)
 
 
 ```
+
 ```{r}
 library(dplyr)
 library(tibble)
@@ -1020,7 +1036,13 @@ confusionMatrix(pred_rf, test_data$paper_BRCA_Subtype_PAM50)
 
 
 ```
-Right away, we can see that the multi-class test fits out data better since the model is not only reported to be better than the null model (P < 0.05), but it has a much lower NIR (0.53 instead of 0.96) meaning its taking a lot of fewer guesses and the specificity and sensitivity of the test also returns good values, especially at subtypes: Her2 and Basal but also LumA.
+
+Right away, we can see that the multi-class test fits out data better
+since the model is not only reported to be better than the null model (P
+\< 0.05), but it has a much lower NIR (0.53 instead of 0.96) meaning its
+taking a lot of fewer guesses and the specificity and sensitivity of the
+test also returns good values, especially at subtypes: Her2 and Basal
+but also LumA.
 
 kNN - Multi class:
 
@@ -1061,7 +1083,6 @@ pred_multinom <- predict(model_multinom, test_data)
 confusionMatrix(pred_multinom, test_data$paper_BRCA_Subtype_PAM50)
 ```
 
-
 ```{r}
 
 truth <- droplevels(test_data$paper_BRCA_Subtype_PAM50)
@@ -1093,8 +1114,6 @@ tibble(models=c("Logistic Regression", "k-Nearest Neighbors", "Random Forest"),
 ```
 
 ### For each model, report: accuracy, F1, per-class precision/recall.
-
-
 
 ## Step 8 — Method Comparison
 
@@ -1175,10 +1194,7 @@ conf_tbl <- tibble(
 conf_tbl
 ```
 
-
-
 ### Evaluate whether the top DEGs (Step 6) rank highly as predictive features (Step 7 feature importance). Overlap analysis with UpSet plot or Venn diagram.
-
 
 # Part II — Clinical Data Analysis
 
@@ -1209,6 +1225,12 @@ table(anot_paper$paper_BRCA_Subtype_PAM50, useNA = "ifany")
 sum(is.na(anot_paper$paper_BRCA_Subtype_PAM50))
 ```
 
+### Interpretation:
+
+Dataset was narrowed down to 24 paper\_ columns.
+
+No missing PAM50 subtype assignments, so no need to drop samples.
+
 ## Step B — Clinical Variable Exploration
 
 ### Explore the clinical metadata as a standalone dataset before merging with expression data.
@@ -1232,6 +1254,18 @@ print(table(anot_paper$paper_BRCA_Pathology, useNA = "ifany"))
 
 ```
 
+### Interpretation:
+
+**Age at initial Pathological Diagnosis:** The age distribution is
+roughly normal, peaking at around 60.
+
+**Pathologic Stage:** Most patients in the cohort were diagnosed with
+stage II BRCA, followed by Stage I and III. Stage IV cases, on the
+orther hand, were rare.
+
+**BRCA Pathology:** Invasise Ductal Carcinoma is by far the dominant
+histological subtype.
+
 ### Tabulate paper_vital_status and compute median follow-up time.
 
 ```{r}
@@ -1241,6 +1275,8 @@ print(table(anot_paper$paper_vital_status, useNA = "ifany"))
 median_followup_days <- median(anot_paper$paper_days_to_last_followup, na.rm = TRUE)
 print(median_followup_days)
 ```
+
+### Interpretation:
 
 ### Examine multi-omic cluster columns (paper_CNV.Clusters, paper_mRNA.Clusters, paper_Protein.Clusters) — how do they relate to PAM50?
 
@@ -1257,6 +1293,24 @@ cat("--- Protein Clusters vs PAM50 ---\n")
 print(table(Cluster = anot_paper$paper_Protein.Clusters, PAM50 = anot_paper$paper_BRCA_Subtype_PAM50))
 cat("\n")
 ```
+
+### Interpretation:
+
+Across all multi-omic datasets, Basal subtype samples cluster closely
+together (mRNA: 175 of 192 basal tumors in Cluster 4; CNV: 136 tumors in
+Cluster 4; Protein: 138 tumors in Cluster 5). This demonstrates that
+Basal tumors are highly distinct from other subtypes, not only at the
+transcriptomic (mRNA) level, but also at the proteomic and genomic (copy
+number variation) levels.
+
+In contrast, Luminal A and B tumors tend to co-cluster, particularly
+within the mRNA and protein datasets. Both LumA and LumB predominantly
+share Cluster 1 at the mRNA and protein levels.
+
+The HER2 subtype is more widely dispersed across different clusters,
+especially in the CNV and protein data. However, they also frequently
+co-cluster with the Luminal A and B subtypes at both the mRNA and
+protein levels.
 
 ## Step C — Clinical Feature Classification
 
@@ -1384,6 +1438,31 @@ lr_importance <- varImp(lr_model, scale = FALSE)
 plot(lr_importance, main = "Logistic Regression Feature Importance")
 ```
 
+### Interpretation:
+
+All three models (Logistic Regression, Random Forest, k-NN) failed to
+meaningfully predict vital status, each achieving \~87% accuracy,
+identical to the No Information Rate (NIR), the baseline achieved by
+predicting "Alive" for every patient regardless of features. Kappa
+values of \~0.066 and specificity below 6% confirm that almost no
+deceased patients were correctly identified. AUC values of 0.588, 0.603,
+and 0.622 respectively sit just above the random baseline of 0.5,
+considered very poor for clinical classification.
+
+The primary cause is class imbalance. Approximately \~ 86% of patients
+were alive at last follow-up, which caused all three models to converge
+on the majority class as the dominant prediction strategy.
+
+In hindsight, PAM50 subtype would have been a more suitable outcome
+variable, offering better class balance and genuine molecular
+distinctiveness as demonstrated by the strong results in Part I.
+
+Despite the classification failure, the logistic regression coefficients
+were biologically coherent. Stage IV disease was the strongest predictor
+of mortality (β = 3.83, p \< 0.001), followed by older age and\
+Stage III. LumA on the other hand was significantly protective (β =
+−0.73, p = 0.018).
+
 ## Step D — Integrative Analysis (Expression + Clinical)
 
 ### Correlate top DEGs from Part I with continuous clinical variables (e.g., age) using Spearman's rho.
@@ -1424,6 +1503,20 @@ age_corr_tbl <- lapply(stepD_genes, function(gene) {
 age_corr_tbl %>% slice_head(n = 10)
 ```
 
+### Interpretation:
+
+Spearman's rank correlation was used to test whether the top
+differentially expressed genes (DEGs) correlate with age at diagnosis.
+The top 10 results exhibited almost entirely negative correlations with
+very high statistical significance, indicating that the expression of
+these genes tends to be lower in older patients. However, many of the
+genes in this list (*EGFR*, *SOX10*, *KRT5*, *KRT17*, *GABRP)* are
+established Basal-like subtype markers (Nielsen et al., 2004; Ivanov et
+al., 2013; Sizemore et al., 2014). Because Basal-like breast cancer
+disproportionately affects younger patients, whereas the Luminal A
+subtype predominates in older patients, this observed effect is likely
+driven by subtype distribution rather than a direct biological effect of
+age.
 
 ### Test whether top DEGs differ significantly across clinical stages.
 
@@ -1443,6 +1536,14 @@ stage_diff_tbl <- lapply(stepD_genes, function(gene) {
 
 stage_diff_tbl %>% slice_head(n = 10)
 ```
+
+The genes most significantly differentially expressed across pathologic
+stages form a functionally coherent group of proliferation markers:
+*MKI67* (Dowsett et al., 2011), *BIRC5* (Altieri, 2008), *TPX2*, *RRM2*,
+*CENPF*, and *ANLN*. These are all centrally involved in cell cycle
+progression and mitosis (Whitfield et al., 2006). This observation
+aligns with clinical expectations, as more advanced tumor stages are
+typically characterized by higher expression of proliferative genes.
 
 ### Build a multimodal classifier: combine top expression features (from Step 7 / RF importance) with key clinical features. Does adding clinical data improve performance?
 
@@ -1511,6 +1612,14 @@ tibble(
 )
 ```
 
+### Interpretation:
+
+Adding expression data to the clinical data did not improve the model;
+in fact, it slightly decreased its performance. Increasing the number of
+variables in a model increases complexity and the likelihood of
+overfitting. Furthermore, RNA-seq expression data is inherently noisy,
+which makes it difficult for the model to distinguish true biological
+signals from technical variation, ultimately degrading its performance.
 
 ### Visualize: boxplots of top expression features stratified by clinical subgroups; annotated heatmap with both molecular and clinical annotation bars.
 
@@ -1554,8 +1663,36 @@ pheatmap(
 )
 ```
 
+### Interpretation:
 
-### 
+The boxplots show expression of four top DEGs (EGFR, GABRP, SFRP1,
+SOX10) stratified by pathologic stage. The expression patterns seems to
+be largely flat across stages. This potentially stems from all four
+genes being Basal-like tumor markers. Their expression therefore
+primarily reflects subtype composition within each stage rather than
+stage-driven regulation. Since the proportion of Basal patients does not
+change dramatically across stages in this cohort, the stage-stratified
+expression distributions remain broadly similar. Notably however, Stage
+IV show wider ranges and more variable medians, particularly in GABRP
+and SOX10.
+
+The heatmap displays the top age-correlated DEGs (rows) across all
+samples (columns), with three clinical annotation bars at the top: vital
+status, pathologic stage, and PAM50 subtype.
+
+The dominant variable seems to be the PAM50 subtype, not stage or vital
+status. The PAM50 annotation bar (bottom row, yellow = LumA, teal =
+Basal) shows a clear separation that mirrors the expression pattern in
+the heatmap body. The large yellow LumA block on the left corresponds to
+low expression (blue) across all genes, while the right-side block,
+which is enriched with Basal samples , shows high expression of Basal
+marker genes, such as, EGFR, GABRP, SOX10, KRT5, KRT17, DSC3, KLK7,
+SFRP1, and COL17A1. EGFR stands out, with very high expression in the
+process.
+
+Vital status and the Patholigcal stage on the other hand seems to to
+have a lower impact on expression, indicating that PAM50 subtype is the
+primary driver of expression variation.
 
 ## Step E - Discussion & Interpretation
 
@@ -1563,8 +1700,33 @@ pheatmap(
 
 ### Are the molecular subtypes (from expression clustering) concordant with clinical staging? Where do they disagree?
 
+```{r}
+concordance_table <- table(anot_clean$paper_pathologic_stage, 
+                           anot_clean$paper_BRCA_Subtype_PAM50, 
+                           useNA = "ifany")
+
+print(concordance_table)
+```
+
+As shown in the table and heatmaps in Steps 6 and D, there is no clear
+concordance between PAM50 molecular subtypes and clinical stage at
+diagnosis. Conventionally, one might expect aggressive tumors, such as
+the Basal-like subtype, to present at advanced stages, and indolent
+Luminal A tumors to present at early stages. However, in this cohort,
+Basal subtypes are primarily concentrated in Stage II, while Luminal A
+tumors are frequently observed in Stage III. This discrepancy arises
+because molecular biology and clinical stage measure distinct aspects of
+the disease. A highly aggressive, rapidly proliferating Basal-like tumor
+may become clinically apparent and be diagnosed early (Stage I or II).
+Conversely, an indolent, slow-growing Luminal A tumor might remain
+asymptomatic for years, eventually presenting at an advanced clinical
+stage (Stage III). Ultimately, intrinsic tumor biology does not strictly
+dictate the timeline of clinical discovery.
+
 ### Which data modality — expression or clinical — gives better predictive accuracy for your outcome variable?
 
 ### What biological mechanisms might explain the top DEGs found between clinical subgroups?
 
 ### What are the limitations of the TCGA cohort for clinical prediction (sample size per stage, selection of academic-centre patients, etc.)?
+
+For the outcome variable, chosen in step C. The data is too skewed
