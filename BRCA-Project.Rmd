@@ -64,6 +64,8 @@ We keep only the curated publication-level columns (those starting with
 `paper_`) plus the `barcode` identifier. This filters out internal TCGA
 processing columns that are not relevant for our analysis.
 
+This step had however already been done before we got the data.
+
 ```{r}
 # --- 1. Samples and Genes in the Expression Matrix ---
 
@@ -297,13 +299,11 @@ pheatmap(
 )
 ```
 
-### Interpret: does the correlation structure correspond to PAM50 subtypes?
-
 The heatmap shows a clear **block-diagonal structure** that aligns
 closely with the PAM50 subtype annotation:
 
 -   **Basal** samples form the most isolated, highest-contrast block —
-    their expression programme is fundamentally different from all other
+    their expression program is fundamentally different from all other
     subtypes. This is consistent with the TCGA paper, which found
     basal-like tumours to have the most distinct multi-platform
     signature.
@@ -413,7 +413,7 @@ tibble(k = k_values, avg_silhouette = sil_avg)
 km_best <- kmeans(x = exp_t, centers = 2, nstart = 10)
 s_best <- silhouette(km_best$cluster, D)
 plot(s_best, col = "blue", border = NA,
-     main = paste("Silhouette Plot for K-means (k =", best_k, ")"))
+     main = paste("Silhouette Plot for K-means (k = 2"))
 ```
 
 The average silhouette score was not desirable, but the highest was
@@ -475,6 +475,14 @@ while other clusters are comfortable where they are, Normal type also
 has a noticable number of samples in the basal-type cluster.
 
 ## Step 5 — PCA Visualization
+
+Here we feed the transposed expression data into prcomp without scaling but with centring.
+
+```{r}
+pca_result <- exp_t %>% 
+  prcomp(center = TRUE, scale = FALSE)
+
+```
 
 ### Plot PC1 vs. PC2 and PC1 vs. PC3, colored by PAM50 subtype and by hierarchical cluster
 
@@ -793,6 +801,14 @@ properly, so that we have either a "normal" or a "tumor". For this, we
 can use `dplyr`. Afterwards, the data is cleaned and prepared for
 machine learning. All categorical data, with the exceptiopn of
 `PAM50subtypes`, are made into numeric and NAs are omitted.
+
+Cruicially, With this step, the cluster information from the clinical
+data will also be removed, even though it could be of importance for the
+training. This could have been avoided if separate parameters were
+generated from the columns. For example for Protein clusters we could
+have 1-6 instead of C1-6. We thought the expression data would be enough
+and skipped this step.
+
 `PAM50subtypes` is also saved as a factor with two levels: `tumor` and
 `Normal`Additionally, the top 30 genes with the most sd (which are
 believed to be highly variable) are aligned with the samples to have
@@ -1842,6 +1858,23 @@ pheatmap(
 ### Are the molecular subtypes (from expression clustering) concordant with clinical staging? Where do they disagree?
 
 ### Which data modality — expression or clinical — gives better predictive accuracy for your outcome variable?
+
+Looking at the results from both binary and multiclass classification
+from Part 1, we see that the expression data helped the models perform
+better than the clinical data. However, theres a catch: In out analysis
+the clinical data was largely omitted from the training, since it
+consisted of categorical data and we used numerical data for the
+training. This could have been avoided if we converted the categories
+into unique numerical data using `mutate` and a bit of intuition, but we
+thought the expression data would suffice for the training.
+
+Considering this, we could have seen a different outcome, had we thought
+to preprocess the clinical data for use.
+
+In Part 2, where we are investigating the "Alive" or "Dead" data, Age
+is, expectedly, shown to be the most important factor. But this might
+have been because of us not including the expression data as well in the
+training.
 
 ### What biological mechanisms might explain the top DEGs found between clinical subgroups?
 
