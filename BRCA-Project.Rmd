@@ -1749,14 +1749,19 @@ Stage III. LumA on the other hand was significantly protective (β =
 
 ### Correlate top DEGs from Part I with continuous clinical variables (e.g., age) using Spearman's rho.
 
-```{r}
+```{r age-correlation, message=FALSE, warning=FALSE}
+# Extract the unique top 20 DEGs and verify presence in the expression matrix
 stepD_genes <- unique(top20$gene)
 stepD_genes <- intersect(stepD_genes, rownames(expr_clean))
 
+# Identify overlapping samples across expression and clinical datasets
 stepD_samples <- intersect(colnames(expr_clean), anot_clean$barcode)
+
+# Process expression data: subset to top DEGs/overlapping samples and transpose
 stepD_expr <- as.data.frame(t(expr_clean[stepD_genes, stepD_samples, drop = FALSE]))
 stepD_expr$barcode <- rownames(stepD_expr)
 
+# Process clinical data: select key variables and filter for matching samples
 stepD_clin <- anot_clean %>%
   select(
     barcode,
@@ -1767,143 +1772,153 @@ stepD_clin <- anot_clean %>%
   ) %>%
   filter(barcode %in% stepD_samples)
 
+# Merge datasets by sample barcode
 stepD_df <- inner_join(stepD_clin, stepD_expr, by = "barcode")
 
+# Compute Spearman's rank correlation between gene expression and age
 age_corr_tbl <- lapply(stepD_genes, function(gene) {
   x <- stepD_df[[gene]]
   y <- stepD_df$paper_age_at_initial_pathologic_diagnosis
+  
+  # Filter for complete pairwise cases
   ok <- !is.na(x) & !is.na(y)
+  
+  # Enforce minimum sample size to avoid statistical artifacts
   if (sum(ok) < 3) {
-    return(tibble(gene = gene, rho = NA_real_, p_value = NA_real_))
+    return(tibble::tibble(gene = gene, rho = NA_real_, p_value = NA_real_))
   }
+  
   ct <- suppressWarnings(cor.test(x[ok], y[ok], method = "spearman"))
-  tibble(gene = gene, rho = unname(ct$estimate), p_value = ct$p.value)
+  tibble::tibble(gene = gene, rho = unname(ct$estimate), p_value = ct$p.value)
 }) %>%
   bind_rows() %>%
   arrange(p_value)
 
-age_corr_tbl %>% slice_head(n = 10)
+# Display the top 10 most significantly correlated features
+knitr::kable(slice_head(age_corr_tbl, n = 10), digits = 4, caption = "Top 10 Age-Correlated DEGs")
 ```
+
 
 ### Interpretation:
 
-Spearman's rank correlation was used to test whether the top
-differentially expressed genes (DEGs) correlate with age at diagnosis.
-The top 10 results exhibited almost entirely negative correlations with
-very high statistical significance, indicating that the expression of
-these genes tends to be lower in older patients. However, many of the
-genes in this list (*EGFR*, *SOX10*, *KRT5*, *KRT17*, *GABRP)* are
-established Basal-like subtype markers (Nielsen et al., 2004; Ivanov et
-al., 2013; Sizemore et al., 2014). Because Basal-like breast cancer
-disproportionately affects younger patients, whereas the Luminal A
-subtype predominates in older patients, this observed effect is likely
-driven by subtype distribution rather than a direct biological effect of
-age.
+Spearman's rank correlation was applied to evaluate the relationship between the top differentially expressed genes (DEGs) and patient age at diagnosis. The top 10 results exhibited almost entirely negative $\rho$ coefficients with strong statistical significance, superficially indicating that the expression of these genes decreases in older patients.However, several genes within this cohort (EGFR, SOX10, KRT5, KRT17, and GABRP) are well-established biomarkers of the Basal-like molecular subtype. Because Basal-like breast cancer disproportionately affects younger cohorts while the Luminal A subtype predominates in older populations, this observed negative correlation is likely driven by confounding patient subtype distributions rather than a direct biological effect of chronological aging.
+### Visualize: boxplots of top expression features stratified by clinical subgroups; annotated heatmap with both molecular and clinical annotation bars.
 
-### Test whether top DEGs differ significantly across clinical stages.
+## Test whether top DEGs differ significantly across clinical stages.
 
 ```{r}
+# Evaluate expression variations across pathologic stages using Kruskal-Wallis tests
 stage_diff_tbl <- lapply(stepD_genes, function(gene) {
-  x <- stepD_df[[gene]]
+  x   <- stepD_df[[gene]]
   grp <- stepD_df$paper_pathologic_stage
-  ok <- !is.na(x) & !is.na(grp)
+  ok  <- !is.na(x) & !is.na(grp)
+  
   if (length(unique(grp[ok])) < 2) {
-    return(tibble(gene = gene, p_value = NA_real_))
+    return(tibble::tibble(gene = gene, p_value = NA_real_))
   }
+  
   kt <- suppressWarnings(kruskal.test(x[ok] ~ grp[ok]))
-  tibble(gene = gene, p_value = kt$p.value)
+  tibble::tibble(gene = gene, p_value = kt$p.value)
 }) %>%
   bind_rows() %>%
   arrange(p_value)
 
-stage_diff_tbl %>% slice_head(n = 10)
+# Display the top 10 most stage-differentiated features
+knitr::kable(slice_head(stage_diff_tbl, n = 10), digits = 4, caption = "Top 10 Stage-Differentiated DEGs")
 ```
 
-The genes most significantly differentially expressed across pathologic
-stages form a functionally coherent group of proliferation markers:
-*MKI67* (Dowsett et al., 2011), *BIRC5* (Altieri, 2008), *TPX2*, *RRM2*,
-*CENPF*, and *ANLN*. These are all centrally involved in cell cycle
-progression and mitosis (Whitfield et al., 2006). This observation
-aligns with clinical expectations, as more advanced tumor stages are
-typically characterized by higher expression of proliferative genes.
+### Interpretation:
+The genes displaying the most significant differential expression across pathologic stages form a functionally coherent cluster of proliferation markers, including MKI67, BIRC5, TPX2, RRM2, CENPF, and ANLN. These features are centrally involved in cell cycle progression, spindle assembly, and mitosis. This observation aligns robustly with clinical expectations, as advanced tumor stages are characteristically driven by elevated tumor proliferation kinetics and higher mitotic indices.
 
-### Build a multimodal classifier: combine top expression features (from Step 7 / RF importance) with key clinical features. Does adding clinical data improve performance?
+## Build a multimodal classifier: combine top expression features with key clinical features.
+
 
 ```{r}
+# Isolate the names of the top 10 age-correlated features
 stepD_top_expr <- age_corr_tbl %>%
   filter(!is.na(p_value)) %>%
   arrange(p_value) %>%
   slice_head(n = 10) %>%
   pull(gene)
 
+# Construct final modeling data frame with clean variable formatting
 stepD_model_df <- stepD_df %>%
   select(
-    barcode,
     paper_vital_status,
     paper_age_at_initial_pathologic_diagnosis,
     paper_pathologic_stage,
     paper_BRCA_Subtype_PAM50,
     all_of(stepD_top_expr)
   ) %>%
-  drop_na() %>%
+  drop_na() %>% 
   mutate(
     Target = factor(paper_vital_status, levels = c("Alive", "Dead")),
-    Age = paper_age_at_initial_pathologic_diagnosis,
-    Stage = as.factor(paper_pathologic_stage),
-    PAM50 = as.factor(paper_BRCA_Subtype_PAM50)
+    Age    = paper_age_at_initial_pathologic_diagnosis,
+    Stage  = as.factor(paper_pathologic_stage),
+    PAM50  = as.factor(paper_BRCA_Subtype_PAM50)
   ) %>%
   select(Target, Age, Stage, PAM50, all_of(stepD_top_expr))
 
+# Partition data into 70% Training and 30% Testing splits
 set.seed(42)
-stepD_idx <- createDataPartition(stepD_model_df$Target, p = 0.7, list = FALSE)
+stepD_idx   <- createDataPartition(stepD_model_df$Target, p = 0.7, list = FALSE)
 stepD_train <- stepD_model_df[stepD_idx, ]
 stepD_test  <- stepD_model_df[-stepD_idx, ]
 
+# Configure 5-fold cross-validation with class probabilities enabled
 stepD_ctrl <- trainControl(
-  method = "cv",
-  number = 5,
-  classProbs = TRUE,
+  method          = "cv",
+  number          = 5,
+  classProbs      = TRUE,
   summaryFunction = twoClassSummary
 )
 
+# Train the Clinical-only Baseline Model
 rf_clin <- train(
   Target ~ Age + Stage + PAM50,
-  data = stepD_train,
-  method = "rf",
+  data      = stepD_train,
+  method    = "rf",
   trControl = stepD_ctrl,
-  metric = "ROC"
+  metric    = "ROC"
 )
 
+# Train the Integrated Multimodal Model (Clinical + Transcriptomic Features)
 rf_multi <- train(
   Target ~ .,
-  data = stepD_train,
-  method = "rf",
+  data      = stepD_train,
+  method    = "rf",
   trControl = stepD_ctrl,
-  metric = "ROC"
+  metric    = "ROC"
 )
 
-prob_clin <- predict(rf_clin, newdata = stepD_test, type = "prob")[, "Alive"]
+# Generate class probability predictions for evaluation
+prob_clin  <- predict(rf_clin,  newdata = stepD_test, type = "prob")[, "Alive"]
 prob_multi <- predict(rf_multi, newdata = stepD_test, type = "prob")[, "Alive"]
 
-roc_clin <- roc(stepD_test$Target, prob_clin, levels = c("Alive", "Dead"))
-roc_multi <- roc(stepD_test$Target, prob_multi, levels = c("Alive", "Dead"))
+# Calculate Receiver Operating Characteristic curves
+roc_clin  <- pROC::roc(stepD_test$Target, prob_clin,  levels = c("Alive", "Dead"))
+roc_multi <- pROC::roc(stepD_test$Target, prob_multi, levels = c("Alive", "Dead"))
 
-tibble(
+# Construct and render the final performance summary table
+auc_summary <- tibble::tibble(
   Model = c("Clinical only", "Expression + clinical"),
-  AUC = c(auc(roc_clin), auc(roc_multi))
+  AUC   = c(pROC::auc(roc_clin), pROC::auc(roc_multi))
 )
+
+knitr::kable(auc_summary, digits = 4, caption = "Multimodal Classifier Performance Comparison")
 ```
 
 ### Interpretation:
 
-Adding expression data to the clinical data did not improve the model;
-in fact, it slightly decreased its performance. Increasing the number of
-variables in a model increases complexity and the likelihood of
-overfitting. Furthermore, RNA-seq expression data is inherently noisy,
-which makes it difficult for the model to distinguish true biological
-signals from technical variation, ultimately degrading its performance.
+Integrating high-dimensional RNA-seq expression data with traditional clinical covariates did not yield an improvement in classification accuracy on the test set; instead, it led to a slight reduction in the Area Under the Curve (AUC).
 
-### Visualize: boxplots of top expression features stratified by clinical subgroups; annotated heatmap with both molecular and clinical annotation bars.
+This performance degradation can be attributed to two main factors:
+
+The Curse of Dimensionality and Overfitting: Expanding the feature space relative to the sample size increases model complexity, which permits the Random Forest architecture to construct hyper-specific decision paths that fit noise in the training split but fail to generalize effectively.
+
+Technical and Biological Noise: High-throughput transcriptomic data contains intrinsic variance resulting from technical batch effects and sample heterogeneity. When tracking a distal clinical outcome like vital status, this background noise can easily mask or dilute the definitive, structural signals provided by clean categorical predictors like tumor stage and intrinsic subtype.
+
+## Visualize: boxplots of top expression features stratified by clinical subgroups:
 
 ```{r fig.height=5, fig.width=10}
 plot_genes <- head(stepD_top_expr, 4)
@@ -2113,3 +2128,4 @@ clinical outcomes.
     (SCGB1D2) in more than 300 human tumors and matching normal tissues
     reveals their co-expression in gynecologic malignancies. *BMC
     Cancer*, 6, 88.
+22. **Dowsett, M., et al. (2011).** Assessment of Ki67 in breast cancer: recommendations from the International Ki67 in Breast Cancer Working Group. *Journal of the National Cancer Institute*, 103(22), 1656-1664.
