@@ -1,26 +1,33 @@
 ---
 title: "BRCA-Project"
-output: html_notebook
-editor_options: 
-  markdown: 
+output:
+  html_document:
+    code_folding: hide
+editor_options:
+  markdown:
     wrap: 72
 ---
 
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(warning = FALSE, message = FALSE)
+```
+
 # PROJECT 1 — TCGA-BRCA \| Breast Invasive Carcinoma
 
-This project analyses RNA-seq gene expression data from The Cancer
-Genome Atlas (TCGA) BRCA cohort. The goal is to predict PAM50 molecular
-subtypes and integrate clinical metadata for biological interpretation.
+With this project, we attempt to analyse RNA-seq gene expression data
+from the Cancer Genome Atlas (TCGA) BRCA cohort. The goal is to use
+clinical and expression data for statistical analysis of the different
+PAM50 subtypes and identifying patterns among other tasks.
 
 **Reference:** The Cancer Genome Atlas Network (2012). Comprehensive
-molecular portraits of human breast tumours. *Nature*, 490, 61–70.
+molecular portraits of human breast tumurs. *Nature*, 490, 61–70.
 
 ------------------------------------------------------------------------
 
 ## Setup — Load Libraries & Data
 
 We load all required packages and the BRCA dataset provided as an
-`.RData` file. \## Cleaning annotations
+`.RData` file.
 
 ```{r}
 load("BRCA_data.RData")
@@ -69,7 +76,7 @@ df_dims <- data.frame("Samples" = dim[1], "annotations" = dim[2]) ; df_dims
 
 ### What is the sample count per PAM50 subtype (paper_BRCA_Subtype_PAM50)?
 
-papter_BRCA-Subtype_PAM50 is our primary target variable. The PAM50
+paper_BRCA-Subtype_PAM50 is our primary target variable. The PAM50
 classifier assigns each tumour to one of five intrinsic subtypes: Basal,
 Her2, LumA, LumB, and Normal-like.
 
@@ -81,6 +88,7 @@ subtype_counts <- table(anot_paper$paper_BRCA_Subtype_PAM50, useNA = "ifany")
 print("Sample count per PAM50 subtype:")
 print(subtype_counts)
 ```
+From the counts of each subtype it can be seen that most samples are of the subtypes: LumA and LumB, followed by basal-like. The other two subtypes are greatly underrepresented. This unevenness in the data is then very likely lead to problems if subtypes are to be compared with each other. 
 
 ```{r}
 ## Finding the Valid Patients
@@ -89,36 +97,31 @@ valid_target_samples <- sum(!is.na(anot_paper$paper_BRCA_Subtype_PAM50))
 cat("Samples with non-NA PAM50 subtype:", valid_target_samples, "\n")
 
 # Alternative
-data.frame("Valid_PAM50_subtypes" = valid_target_samples, "NA" = length(anot_paper$paper_BRCA_Subtype_PAM50)-valid_target_samples)
+#data.frame("Valid_PAM50_subtypes" = valid_target_samples, "NA" = length(anot_paper$paper_BRCA_Subtype_PAM50)-valid_target_samples)
 
-```
-
-## significant breast cancer genes from the paper (genes with the most consistant ):
-
-PIK3CA, PTEN, AKT1, TP53, GATA3, CDH1, RB1, MLL3, MAP3K1, CDKN1B, TBX3,
-RUNX1, CBFB, AFF2, PIK3R1, PTPN22, PTPRD, NF1, SF3B1 and CCND3
-
-## How many annotation columns are retained after cleaning to paper\_ columns?
-
-```{r}
-
-paper_top_genes <- c("PIK3CA", "PTEN", "AKT1", "TP53", "GATA3", "CDH1", "RB1", "MLL3", "MAP3K1", "CDKN1B", "TBX3", "RUNX1", "CBFB", "AFF2", "PIK3R1", "PTPN22", "PTPRD", "NF1", "SF3B1", "CCND3", "MDM2")
-
-interesting_genes <- brca_exp_clean %>% filter(gene %in% paper_top_genes)
-
-
-
-#---------------------Not Needed-------------------
-
-
-# check how many columns start with paper_
-num_paper_cols <- ncol(anot_paper) - 1 # Subtract 1 to exclude the 'barcode' column
-cat("Number of paper_ columns retained:", num_paper_cols, "\n")
 ```
 
 ## Step 2 — Expression Distribution Analysis
 
+## significant breast cancer genes from the paper (genes with the most consistent ):
+
+The most variable genes mentioned in the reference paper are extracted and saved
+for later analysis ():
+
+PIK3CA, PTEN, AKT1, TP53, GATA3, CDH1, RB1, MLL3, MAP3K1, CDKN1B, TBX3,
+RUNX1, CBFB, AFF2, PIK3R1, PTPN22, PTPRD, NF1, SF3B1 and CCND3
+
+```{r}
+paper_top_genes <- c("PIK3CA", "PTEN", "AKT1", "TP53", "GATA3", "CDH1", "RB1", "MLL3", "MAP3K1", "CDKN1B", "TBX3", "RUNX1", "CBFB", "AFF2", "PIK3R1", "PTPN22", "PTPRD", "NF1", "SF3B1", "CCND3", "MDM2")
+
+interesting_genes <- brca_exp_clean %>% filter(gene %in% paper_top_genes)
+```
+
 ### Randomly select 10 genes and visualize their expression distributions across all samples.
+
+For selecting random genes `slice_sample` is used. The expression is
+visualized using a boxplot for readability and highlighting gene
+variability across samples.
 
 ```{r}
 
@@ -140,6 +143,12 @@ geom_boxplot(alpha = 0.7, outlier.size = 0.5) +
 
 
 ```
+
+We see that even randomly selected genes exhibit a noticeable variation
+among each other and among samples. For example YWHAZ has a
+proportionally higher expression level than other genes and THSD4 is
+highly variable across samples, seen from the bigger whiskers and 25%
+and 75% quantile lines.
 
 ### Select the top 5 and bottom 5 most variable genes (by standard deviation); plot their distributions and compare.
 
@@ -192,6 +201,13 @@ ggplot(var_exp, aes(x = reorder(gene, Expression, FUN = median),
 
 ```
 
+We calculated the sd values of each gene across all samples using the
+`apply`command. 
+
+The 5 most variable genes are all clinically significant in the context of breast cancer as they are all markers and checkpoints, meaning their upregulation and downregulation mark transitions in the state of the disease (Lacroix et al. 2006). 
+
+The least variable genes are, as expected, housekeeping genes. For example, HNRNPs are conserved across species and contribute to nucleic acid metabolism (Geuens et al. 2016).
+
 ## Step 3 — Correlation Analysis
 
 ## Prerequisite — Sample Alignment
@@ -213,8 +229,8 @@ all(colnames(brca_exp_clean_ctr) == anot_paper$barcode)
 ```
 
 Because the the result says "TRUE" we don't need to correct the
-alginment. The order and dimensions are aligned. Else we would have to
-write the following aligmentprompt:
+alignment. The order and dimensions are aligned. Else we would have to
+write the following alignment command with `intersect`:
 
 ```{r}
 #Find samples that appear in BOTH the expression matrix "brca_exp_clean" AND the significant annotation file "anot_paper"
@@ -225,23 +241,11 @@ expr_clean <- brca_exp_clean_ctr[ , common_samples]
 anot_clean <- anot_paper[match(common_samples, anot_paper$barcode), ]
 ```
 
-```{r}
-#testing if samples have been removed by comparing dimensions before and after 
-# before
-dim(brca_exp_clean_ctr)
-dim(anot_paper)
-
-# after 
-dim(expr_clean)
-dim(anot_clean)
-
-#this again demonstrates that the last step was unnecessary
-```
 
 ### Compute pairwise Pearson correlations across all samples using the full gene set.
 
 We compute **pairwise Pearson correlations** between all samples using
-the full gene set. The resulting n×n correlation matrix is visualised as
+the full gene set. The resulting $N×N$ correlation matrix is visualized as
 a heatmap. Samples are annotated by PAM50 subtype so we can judge
 whether the correlation structure reflects known biology.
 
@@ -257,61 +261,15 @@ diagonal.
 expr_mat <- as.matrix(brca_exp_clean_ctr)
 
 
-# Arijaan: nimmt das nicht die Correlation zwischen Samples und nicht die Genes?
-# t() würde wohl die Correlation der Gene darstellen S. testblock.
-
 #cor() applied column-wise computes correlation betweent samples. Each column = one sample's expression profile across all genes
 cor_mat <- cor(expr_mat, method = "pearson")
-```
-
-```{r}
-#--------------------------------test block----------------------------------
-# Correlation zwischen top varying Gene (Ohne Annotations)
-
-gene_vars <- apply(brca_exp_clean_ctr, 1, var)
-
-# 2. Extract the names of the top 500 most variable genes
-top_genes <- names(sort(gene_vars, decreasing = TRUE)[1:50])
-
-# 3. Subset your original matrix, transpose, and re-calculate correlation
-expr_mat_subset <- as.matrix(brca_exp_clean_ctr[top_genes, ])
-cor_t_mat_small <- cor(t(expr_mat_subset), method = "pearson")
-
-# Find out which genes have the highest correlation
-# take them out of the ML algo
-
-cor_matrix_clean <- cor_t_mat_small
-diag(cor_matrix_clean) <- NA
-
-# 2. Set your correlation threshold (e.g., absolute correlation > 0.8)
-threshold <- 0.8
-
-# 3. Identify genes that have at least one correlation above the threshold
-# This checks row by row to see if any value exceeds the threshold
-highly_corr_logical <- rowSums(abs(cor_matrix_clean) > threshold, na.rm = TRUE) > 0
-
-# 4. Save the names to a vector
-highly_correlated_genes <- rownames(cor_matrix_clean)[highly_corr_logical]
-# plot heatmap
-pheatmap::pheatmap(
-  cor_t_mat_small,
-  show_rownames = T,
-  show_colnames = T,
-  color = colorRampPalette(c("blue","white","red"))(100),
-  main = "Pairwise Pearson Correlation",
-  treeheight_row = 30,
-  treeheight_col = 30,
-  fontsize = 5
-)
-
-highly_correlated_genes
 ```
 
 ```{r}
 #unwichtig -> gibt mir die dimensions der correlation matrix was logischerweise 1099x1099 ist da das die sample zahl ist
 # gibt auch die value range
 cat("Correlation matrix dimensions:", dim(cor_mat)[1], "x", dim(cor_mat)[2], "\n")
-cat("Value range: [", round(min(cor_mat), 3), ",", round(max(cor_mat), 3), "]\n")
+cat("Corr Value range: [", round(min(cor_mat), 3), ",", round(max(cor_mat), 3), "]\n")
 ```
 
 ### Visualize as a correlation heatmap. What structure do you observe? Are there sub- blocks?
@@ -349,24 +307,6 @@ pheatmap(
 
 ### Interpret: does the correlation structure correspond to PAM50 subtypes?
 
-Struktur: Die Heatmap zeigt eine klare Block-Struktur entlang der
-Diagonale. Man sieht deutlich mindestens zwei große Blöcke mit höherer
-interner Korrelation (dunklere Farbe). Der auffälligste Sub-Block ist
-unten rechts — dieser entspricht den Basal-Samples (rot), die sich stark
-vom Rest abheben. Die übrigen Subtypes bilden einen großen gemeinsamen
-Block links oben, innerhalb dessen schwächere Sub-Strukturen erkennbar
-sind. Entspricht die Korrelationsstruktur den PAM50-Subtypes? Ja,
-größtenteils. Der Basal-Subtyp ist am deutlichsten separiert —
-Basal-Samples korrelieren stark untereinander, aber deutlich weniger mit
-den anderen Subtypes. Das spiegelt wider was auch im TCGA-Paper
-beschrieben wird: Basal-like Tumoren haben das distinkteste molekulare
-Profil. Die luminalen Subtypes LumA und LumB sind weniger klar
-voneinander getrennt, was ihre biologische Ähnlichkeit als ER⁺ Tumoren
-widerspiegelt. Her2 und Normal sind ebenfalls nicht scharf abgegrenzt
-und streuen über den luminalen Block.
-
-### Interpretation
-
 The heatmap shows a clear **block-diagonal structure** that aligns
 closely with the PAM50 subtype annotation:
 
@@ -386,22 +326,66 @@ closely with the PAM50 subtype annotation:
 The existence of these sub-blocks confirms that PAM50 subtypes represent
 genuinely distinct transcriptional states, not arbitrary labels.
 
+
+Furthermore, we can also plot the correlations of top genes as a heatmap to get an overview:
+```{r}
+#--------------------------------test block----------------------------------
+# Correlation zwischen top varying Gene (Ohne Annotations)
+
+gene_vars <- apply(brca_exp_clean_ctr, 1, var)
+
+# 2. Extract the names of the top 500 most variable genes
+top_genes <- names(sort(gene_vars, decreasing = TRUE)[1:50])
+
+# 3. Subset your original matrix, transpose, and re-calculate correlation
+expr_mat_subset <- as.matrix(brca_exp_clean_ctr[top_genes, ])
+cor_t_mat_small <- cor(t(expr_mat_subset), method = "pearson")
+
+# Find out which genes have the highest correlation
+# take them out of the ML algo
+
+cor_matrix_clean <- cor_t_mat_small
+diag(cor_matrix_clean) <- NA
+
+# 2. Set correlation threshold (e.g., absolute correlation > 0.8)
+threshold <- 0.8
+
+# 3. Identify genes that have at least one correlation above the threshold
+# This checks row by row to see if any value exceeds the threshold
+highly_corr_logical <- rowSums(abs(cor_matrix_clean) > threshold, na.rm = TRUE) > 0
+
+# 4. Save the names to a vector
+highly_correlated_genes <- rownames(cor_matrix_clean)[highly_corr_logical]
+# plot heatmap
+pheatmap(
+  cor_t_mat_small,
+  show_rownames = T,
+  show_colnames = T,
+  color = colorRampPalette(c("blue","white","red"))(100),
+  main = "Pairwise Pearson Correlation",
+  treeheight_row = 30,
+  treeheight_col = 30,
+  fontsize = 5
+)
+
+cat("highest correlating genes:\n",highly_correlated_genes)
+```
+
+The shown `highly_correlated_genes` are genes (or groups of genes) that co-express or genes that are upregulated as the others are downregulated. Both negative and positive correlations are seen here since the absoloute value of the correlation values has been taken. 
+
+Interestingly, three of these genes are also seen in the most highly variable genes shown in **part 1** (SCGB2A2, SCGB1D2, TFF1). These genes belong to a group of genes that are upregulated and co-expressed in LumA and LumB subtypes (Zafrakas et a. 2006). They are correlated since they belong to the same group and are most likely variable between the LumA and LumB patients and the other subtypes.
+
+
 ## Step 4 — Hierarchical Clustering
 
 ### Cluster samples using hclust.
 
-Here we tried both the silhouette method and the elbow method for finding the optimal `k` value for clustering. The elbow method did not yield any readable results as it lacked the essential "elbow". We therefore do not present its results. The average silhouette score was also not desirable, but the highest was achieved with two centroids. 
+Here we tried both the silhouette method and the elbow method for
+finding the optimal `k` value for clustering. Both of these methods work by measuring euclidean distances of data points, hence we use . The elbow method did not
+yield any readable results as it lacked the essential "elbow". We
+therefore do not present its results, as to not overfill the output with plots.
 
-This problem with the clustering is because of the data not being heterogenous enough or there not being enough data points generally.
-
-```{r step4-clustering-and-silhouette, fig.width=10, fig.height=6}
-
-# Load required libraries
-library(cluster)
-library(ggplot2)
-library(tibble) # Required for column_to_rownames
-library(dplyr)
-
+```{r clustering-and-silhouette}
 # 1. DATA PREPARATION & DISTANCE CALCULATION
 
 # Transpose matrix so patients are rows, then calculate Euclidean distance
@@ -410,21 +394,37 @@ D <- dist(exp_t)
 
 # 2. HIERARCHICAL CLUSTERING
 hc_result <- hclust(D, method = "ward.D2")
-
-# 3. SILHOUETTE ANALYSIS (Mathematical k)
-km <- kmeans(x = exp_t, centers = 2, nstart = 10)
-s <- silhouette(km$cluster, D)
-
-cat("Average silhouette for k=2:", mean(s[, 3]), "\n")
-plot(s, col = "blue", border = NA, main = "Silhouette Plot for K-means (k=2)")
 ```
+
+
+```{r}
+# Find out average silhouette scores with 2-8 centriods
+k_values <- 2:8
+sil_avg <- sapply(k_values, function(k) {
+  km <- kmeans(x = exp_t, centers = k, nstart = 10)
+  s <- silhouette(km$cluster, D)
+  mean(s[, 3])
+}) # k=2 is optimal
+
+tibble(k = k_values, avg_silhouette = sil_avg)
+
+# Plot silhouette for the best k (expected: k = 2)
+km_best <- kmeans(x = exp_t, centers = 2, nstart = 10)
+s_best <- silhouette(km_best$cluster, D)
+plot(s_best, col = "blue", border = NA,
+     main = paste("Silhouette Plot for K-means (k =", best_k, ")"))
+```
+
+
+The average silhouette score was not desirable, but the highest was achieved with two centroids. This problem with the clustering is because of the data not being heterogeneous enough and there not being enough data points generally. Furthermore, biological overlap between LumA and LumB amoung others, also prevents optimal clustering.
 
 ## Cut the dendrogram to obtain k clusters (choose k; justify your choice).
 
+Here we use `cuttree` to well... you can guess. The handy `rect_hclust` is subsequently used to visualize the clusters. 
+
 ```{r}
-# Cut the tree at k = 2 and k = 5
+# Cut the tree at k = 2
 hc_clusters <- cutree(hc_result, k = 2)
-hc_clusters_5 <- cutree(hc_result, k = 5) 
 
 plot(hc_result,
      labels = FALSE,
@@ -461,46 +461,35 @@ comparison_table_5 <- table(Cluster = comparison_df_5$hc_cluster,
 print("Cluster Membership vs. PAM50 Subtypes (k=2):")
 print(comparison_table)
 
-print("Cluster Membership vs. PAM50 Subtypes (k=5):")
-print(comparison_table_5)
+subtype_counts
 ```
+
+The clustering comparison shows that the Basal-like subtype is quite different than all the other subtypes, placing it in its own cluster and while other clusters are comfortable where they are, Normal type also has a noticable number of samples in the basal-type cluster.
 
 ## Step 5 — PCA Visualization
 
-### Run prcomp on the transposed expression matrix (samples as rows).
+### Plot PC1 vs. PC2 and PC1 vs. PC3, colored by PAM50 subtype and by hierarchical cluster
 
-```{r}
-library(dplyr)
-library(tibble)
 
-# The simplest, safest pipeline:
-pca_result <- exp_t %>% 
-  prcomp(center = TRUE, scale = FALSE)
+```{r PCA}
+# feeding the transposed exp dataset into prcomp
+pca_result <- exp_t %>% # samples as rows
+  prcomp(center = TRUE, scale = FALSE) # use data centering,   
 
-```
-
-### Plot PC1 vs. PC2 and PC1 vs. PC3, colored by PAM50 subtype and by hierarchical cluster.
-
-```{r}
-library(ggplot2)
-library(dplyr)
-
-# 1. Create a dataframe and combine it with the annotation
+# Creates a dataframe and combines it with the annotation
 pca_with_annot <- as.data.frame(pca_result$x) %>%
   merge(anot_paper, by.x = 0, by.y = "barcode") 
-  # by.x = 0 uses the PCA rownames, by.y = "barcode" uses your annotation column
+  # by.x = 0 uses the PCA rownames, by.y = "barcode" uses the annotation column
 
 ggplot(pca_with_annot, aes(x = PC1, y = PC2, color = paper_BRCA_Subtype_PAM50)) +
   geom_point(size = 2, alpha = 0.8) +
   theme_minimal() +
-  # Optional: You can change the colors manually just like your example
   scale_color_manual(values = c("Basal" = "red", "Her2" = "blue", 
                                 "LumA" = "darkgreen", "LumB" = "lightgreen", 
                                 "Normal" = "grey"))
 ggplot(pca_with_annot, aes(x = PC1, y = PC3, color = paper_BRCA_Subtype_PAM50)) +
   geom_point(size = 2, alpha = 0.8) +
   theme_minimal() +
-  # Optional: You can change the colors manually just like your example
   scale_color_manual(values = c("Basal" = "red", "Her2" = "blue", 
                                 "LumA" = "darkgreen", "LumB" = "lightgreen", 
                                 "Normal" = "grey"))
@@ -512,14 +501,16 @@ ggplot(pca_with_annot, aes(x = PC1, y = PC3, color = paper_BRCA_Subtype_PAM50)) 
 PC1 captures the most variance in the dataset and mainly distinguishes
 between Basal and Luminal BRCA tumors. This indicates that the biggest
 biological difference in breast cancer is between hormone-receptor
-negative (Basal) and hormone-receptor positive (Luminal) tumors.
+negative (Basal) and hormone-receptor positive (Luminal) tumors. 
 
-Even though the plot shows an overlap between Luminal A and Luminal B
-tumors, PC2 does seem to distinguish them slightly. Furthermore PC2 also
+Even though the first plot shows an overlap between Luminal A and Luminal B
+tumors, PC2 does seem to distinguish them slightly. Furthermore it also
 seems to distinguish between HER2- and normal-like subtypes. PC3 on the
 other hand doesnt seem to distinguish between PAM50 subtypes, which
 indicates that it may distinguish between secondary biological factors,
-such as Tumor Microenviornment
+such as Tumor microenviornment
+
+One can also see that the differences and the variation between the first and the second plot being much less in the second one. This is because of the lack of information in PC3 compared to PC2. 
 
 ## Step 6 — Differential Expression
 
@@ -530,43 +521,53 @@ other subtypes combined.
 
 A Wilcoxon test is used because it is **non-parametric**, which means it
 does not assume a normal distrubution. This is appropriate for RNA-seq
-date that can be skewed. Also it is robost to outliers
+date that can be skewed. Also it is robust against outliers.
 
-After testing, we apple **Benjamini-Hochberg FDR correction** (BH) to
+After testing, we apply a **Benjamini-Hochberg FDR correction** (BH) to
 police the false discovery rate across the many tests performed. Also we
 report the **top 20 genes per subtype** sorted by adjusted p value.
 
 ### Use a Wilcoxon rank-sum test (one-vs-rest) to identify marker genes for each PAM50 subtype.
 
 ```{r}
-#create vector with the subtype names. Needed for function.
+# verctor with subtype names for use in loop 
 subtypes <- c("Basal", "Her2", "LumA", "LumB", "Normal")
 
 #define function that takes a subtype name as input and tests all genes for that subtype
 wilcoxon_one_vs_rest <- function(subtype){
   is_subtype <- anot_clean$paper_BRCA_Subtype_PAM50 == subtype #one: is true if the sample belongs to the subtype and false if not
-  is_rest <- !is_subtype #rest: oppsite of is_subtype: true for all other samples
+  is_rest <- !is_subtype #rest: opposite of is_subtype: true for all other samples
   
   #rownames gives us gene names, lapply circles through all gene names and executes following code. The result is a list with one entry per gene. The following code extracts expression values of subtype samples (expr_subtype) and rest-samples (expr_rest), as.numeric ensures those are numeric
+  
   results <- lapply(rownames(expr_clean), function(gene) {
     expr_subtype <- as.numeric(expr_clean[gene, is_subtype])
     expr_rest <- as.numeric(expr_clean[gene, is_rest])
+    
 #executes Wilcoxon test, exact = FALSE means that an approximation is used, exaxt calculation is too slow
+    
     wt <- wilcox.test(expr_subtype, expr_rest, exact = FALSE)
+    
 #log2 Folg Change measures how big the difference is: the mean of the subtype samples is devided by the mean of the rest of the samples. 1e-6 ensures that there is no division with 0. Meaning of the results: lfc = 1 -> expression twice as high, lfc = -1 -> expression is half, lfc = 0 -> no difference in expression
+    
     lfc <- log2((mean(expr_subtype) + 1e-6) / (mean(expr_rest) + 1e-6))
-#For every gene the result is saved in a data frame with 4 columns
+    
+#For every gene the result is saved in a data frame with 4 column
+    
     data.frame(gene = gene, subtype = subtype,
                p_value = wt$p.value, log2FC = lfc)
   })
-#results are now a list if 2994 small data frames (one per gene). rbind glues data frames together. do.call uses rbind on all elemts on the list. This results in a singular data frame with 2994 rows for this subtoye 
+  
+#results are now a list if 2994 small data frames (one per gene). rbind glues data frames together. do.call uses rbind on all elemts on the list. This results in a singular data frame with 2994 rows for this subtype
+  
 do.call(rbind, results)
 }
-#lapply tales test_subtype for each of the 5 subtypes, the result is a list of 5 data frames with each having 2994 rows. do.call glues them together again resulting in a dataframe of 14970 rows
+
+#lapply tales test_subtype for each of the 5 subtypes, the result is a list of 5 data frames with each having 2994 rows. do.call glues them together again resulting in a dataframe of 14970 rows 
+
 de_results <- do.call(rbind, lapply(subtypes, wilcoxon_one_vs_rest))
 
 ```
-
 
 ### Apply FDR correction (BH). Report the top 20 genes per subtype by adjusted p-value and log2 fold-change.
 
@@ -599,27 +600,26 @@ top20 <- de_results %>%
 ## seeing if the interesting genes in the paper are in the top 20 DEGs
 
 top20 %>% filter(gene %in% interesting_genes) # nope 
-
+top20 %>% filter(gene %in% gene_variability)
 ```
 
-```{r}
 
-# Arijaan:
+```{r}
 # heatmap with the adjusted p-values. change p_adj to log2fc for the expression.
 heatmap_data <- top20 %>%
   select(gene, subtype, log2FC) %>%
   pivot_wider(names_from = subtype, values_from = log2FC)
 
-# 2. Convert to a true numeric matrix with gene names as row names
+# Convert to a true numeric matrix with gene names as row names
 heatmap_matrix <- as.matrix(heatmap_data[, -1])
 rownames(heatmap_matrix) <- heatmap_data$gene
 
-# 3. Replace any missing values (NAs) with 0 if necessary
+# Replace any missing values (NAs) with 0 if necessary
 heatmap_matrix[is.na(heatmap_matrix)] <- 0
 
-color_palette <- colorRampPalette(c("navy", "white", "firebrick3"))(50)
+color_palette <- colorRampPalette(c("navy", "white", "red3"))(50)
 
-# Plot the heatmap
+
 pheatmap(
   t(heatmap_matrix),
   color = color_palette,
@@ -627,16 +627,19 @@ pheatmap(
   cluster_cols = TRUE,         # Automatically groups subtypes with similar patterns
   scale = "none",              # 'none' because values are already log2FC scales
   border_color = "white",      # Clean cell borders
-  display_numbers = FALSE,     # Set to TRUE if you want text values inside the cells
-  main = "Differential Gene Expression (p_adj) per Subtype"
+  display_numbers = FALSE, # Set to TRUE if you want text values inside the cells
+  fontsize = 10,
+  fontsize_row = 8,
+  fontsize_col = 5,
+  main = "Differential Gene Expression per Subtype (Log2FC)"
 )
 
 
 ```
+With this plot we see that the differential expression of the highest variable genes is very similar in most genes, but does differ in some gene
 
 ### Generate an annotated heatmap (rows = top DEGs, columns = samples, annotation bars = PAM50 subtype and pathologic stage).
 
-Annotated heatmap of the Top DEGs (Z-score normalised).
 
 ```{r}
 top_gene_names <- unique(top20$gene) #generates all uniqzue gene names of the top 20 of all subtypes (max 5*20 = 100 genes). 
@@ -669,26 +672,24 @@ pheatmap(
   cluster_rows = TRUE, #cluster genes using expression pattern
   color = colorRampPalette(c("blue", "white", "red"))(100),
   main = "Top DEGs per PAM50 Subtype (Z-scored expression)",
-  fontsize_row = 6
+  fontsize_row = 3
 )
 ```
 
 ## Step 7 — Prediction Models
 
-### Split data 70/30 (stratified by subtype).
 
 ```{r}
-
 # Function to remove columns with lots of NAs (more than half of the entries).
 #Used later on in the script.
+
+#find the columns with more than "p" NAs (0.5 for 50%) and removes them using indexing
 nacol_rm <- function(df,p){
 too_many_nas <- colSums(is.na(df)) > round(nrow(df)*p)
 bad_column_names <- colnames(df)[too_many_nas]
 df <- df[, !too_many_nas]
 }
 ```
-
-
 
 ### Binary task — tumor vs. normal: Logistic Regression, Random Forest, k-NN. Report confusion matrices and AUC-ROC.
 
@@ -702,8 +703,13 @@ subtypes according to the PCA.
 
 For binary analysis of the data, we need to annotate the subtypes
 properly, so that we have either a "normal" or a "tumor". For this, we
-can use `dplyr`.
-Afterwards, the data is cleaned and prepared for machine learning. All categorical data, with the exceptiopn of `PAM50subtypes`, are made into numeric and NAs are omitted. `PAM50subtypes` is also saved as a factor with two levels: `tumor` and `Normal`Additionally, the top 30 genes with the most sd (which are believed to be highly variable) are aligned with the samples to have more parameters for the training.
+can use `dplyr`. Afterwards, the data is cleaned and prepared for
+machine learning. All categorical data, with the exceptiopn of
+`PAM50subtypes`, are made into numeric and NAs are omitted.
+`PAM50subtypes` is also saved as a factor with two levels: `tumor` and
+`Normal`Additionally, the top 30 genes with the most sd (which are
+believed to be highly variable) are aligned with the samples to have
+more parameters for the training.
 
 ```{r}
 
@@ -731,28 +737,10 @@ binary_data <- binary_data %>%
 
 binary_data$paper_BRCA_Subtype_PAM50 <- factor(binary_data$paper_BRCA_Subtype_PAM50, levels=c("tumor","Normal"))
 
-
-
-
-# Identify which columns are NOT factors
-#bad <- !sapply(binary_data, is.factor)
-#binary_data[bad] <- lapply(binary_data[bad], as.factor)
-# Apply as.factor only to those columns and update the dataframe in place
-
-
-#badcols <- c(1,2,10,14,15)
-#binary_data <- binary_data[,-badcols]
-
 ```
 
-```{r}
-#test block
+We use `caret` to create 70/30 training and testing datasets.
 
-#l <- lapply(1:length(colnames(binary_data)),function(x){class(binary_data[,x])})
-#olevels <- lapply(1:length(colnames(binary_data)),function(x){levels(binary_data[,x])})
-```
-
-We use `caret` to create 70/30 training and testing datasets. 
 ```{r}
 
 # -----------------Using caret to create the test and training data------------
@@ -765,7 +753,14 @@ test_data  <- binary_data[-trainIndex, ]
 
 ```
 
-Starting with a logistic regression model, we use the `glm` function from `stats` while using the binomial family to specify the type as a logistic regression. we check the final results using the `summary` function. For generating a cross-tabulation table, first the prediction is made on the test data. Subsequently, the result of the prediction is in probabilities and needs to be turned back into the factor values. After this step is cross-tabulation table can be generate.
+Starting with a logistic regression model, we use the `glm` function
+from `stats` while using the binomial family to specify the type as a
+logistic regression. we check the final results using the `summary`
+function. For generating a cross-tabulation table, first the prediction
+is made on the test data. Subsequently, the result of the prediction is
+in probabilities and needs to be turned back into the factor values.
+After this step is cross-tabulation table can be generate.
+
 ```{r Logistic regression}
 
 # Creating the model using the glm function from the stats library while using the binomial family to specify the type as a logistic regression. 
@@ -839,8 +834,9 @@ plot(model_knn)
 
 model_knn$bestTune[,"k"] # optimal k
 ```
-We see that the optimal k is 13, meaning 13 neighbors for each data point.
 
+We see that the optimal k is 13, meaning 13 neighbors for each data
+point.
 
 #### Random forest
 
@@ -869,6 +865,7 @@ varImpPlot(model_rf, main = "Feature Importance", n.var = 10)
 
 
 ```
+
 ```{r}
 library(dplyr)
 library(tibble)
@@ -1020,7 +1017,13 @@ confusionMatrix(pred_rf, test_data$paper_BRCA_Subtype_PAM50)
 
 
 ```
-Right away, we can see that the multi-class test fits out data better since the model is not only reported to be better than the null model (P < 0.05), but it has a much lower NIR (0.53 instead of 0.96) meaning its taking a lot of fewer guesses and the specificity and sensitivity of the test also returns good values, especially at subtypes: Her2 and Basal but also LumA.
+
+Right away, we can see that the multi-class test fits out data better
+since the model is not only reported to be better than the null model (P
+\< 0.05), but it has a much lower NIR (0.53 instead of 0.96) meaning its
+taking a lot of fewer guesses and the specificity and sensitivity of the
+test also returns good values, especially at subtypes: Her2 and Basal
+but also LumA.
 
 kNN - Multi class:
 
@@ -1047,7 +1050,9 @@ confusionMatrix(pred_knn, test_data$paper_BRCA_Subtype_PAM50)
 
 ```
 
-Multinomial logistic regression:
+#### Multinomial logistic regression:
+
+this is the equivalent to the logistic regression. it calculates the log-odds for each category, taking one class as a base-line. Then it converts these odds into probabilities, on which it uses the Maximum Likelihood Estimation algorithm to calculate parameters. 
 
 ```{r}
 model_multinom <- train(paper_BRCA_Subtype_PAM50 ~ ., 
@@ -1061,28 +1066,50 @@ pred_multinom <- predict(model_multinom, test_data)
 confusionMatrix(pred_multinom, test_data$paper_BRCA_Subtype_PAM50)
 ```
 
-
 ```{r}
 
 truth <- droplevels(test_data$paper_BRCA_Subtype_PAM50)
 
-# Logistic: prob_logit is already numeric from glm
-p_logit <- prob_logit  # check: this is P(class == "Normal") if levels are c("tumor","Normal")
+prob_multinom <- predict(model_multinom, newdata = test_data, type = "prob")
+prob_rf       <- predict(model_rf,       newdata = test_data, type = "prob")
+prob_knn      <- predict(model_knn,      newdata = test_data, type = "prob")
 
-# Random forest probs
-p_rf <- predict(model_rf, newdata = test_data, type = "prob")[, "tumor"]
-p_knn <- predict(model_knn, newdata = test_data, type = "prob")[, "tumor"]
+# Multiclass AUC (macro-averaged)
+roc_multinom <- pROC::multiclass.roc(truth, prob_multinom)
+roc_rf       <- pROC::multiclass.roc(truth, prob_rf)
+roc_knn      <- pROC::multiclass.roc(truth, prob_knn)
 
+classes <- levels(truth)
+roc_list <- lapply(classes, function(cls) {
+  roc(response = truth == cls,
+            predictor = prob_multinom[, cls],
+            levels = c(FALSE, TRUE),
+            quiet = TRUE)
+})
 
-roc_logit <- roc(truth, p_logit, levels = c("tumor", "Normal"))
-roc_rf    <- roc(truth, p_rf,    levels = c("tumor", "Normal"))
-roc_knn   <- roc(truth, p_knn, levels = c("tumor", "Normal"))
+plot(roc_list[[2]], col = 1, lwd = 2, main = "Random Forest: one-vs-rest ROC")
+if (length(roc_list) > 1) {
+  for (i in 2:length(roc_list)) lines(roc_list[[i]], col = i, lwd = 2)
+}
+legend("bottomright", legend = classes, col = seq_along(classes), lwd = 2)
+```
 
-plot(roc_logit, col="blue", main="ROC Curves", lwd=2)
-lines(roc_rf, col="green", lwd=2)
-lines(roc_knn, col="red", lwd=2)
-legend("bottomright", legend=c("Logistic","Random Forest","k-NN"),
-       col=c("blue","green","red"), lwd=2)
+```{r}
+target_class <- "Basal"
+
+roc_multinom <- pROC::roc(truth == target_class, prob_multinom[, target_class],
+                          levels = c(FALSE, TRUE), quiet = TRUE)
+roc_rf       <- pROC::roc(truth == target_class, prob_rf[, target_class],
+                          levels = c(FALSE, TRUE), quiet = TRUE)
+roc_knn      <- pROC::roc(truth == target_class, prob_knn[, target_class],
+                          levels = c(FALSE, TRUE), quiet = TRUE)
+
+plot(roc_multinom, col = "blue",  lwd = 2, main = paste("One-vs-rest ROC:", target_class))
+lines(roc_rf,      col = "green", lwd = 2)
+lines(roc_knn,     col = "red",   lwd = 2)
+legend("bottomright",
+       legend = c("Multinom", "Random Forest", "k-NN"),
+       col = c("blue", "green", "red"), lwd = 2)
 ```
 
 ```{r}
@@ -1092,42 +1119,44 @@ tibble(models=c("Logistic Regression", "k-Nearest Neighbors", "Random Forest"),
 
 ```
 
+```{r}
+
+rocs <- c(
+  auc(roc_multinom),
+  auc(roc_knn),
+  auc(roc_rf)
+)
+
+tibble(
+  models = c("Multinomial Logistic", "k-Nearest Neighbors", "Random Forest"),
+  AUC = rocs
+)
+
+```
+
 ### For each model, report: accuracy, F1, per-class precision/recall.
 
-
-
-## Step 8 — Method Comparison
-
-### Compare model performance systematically in a summary table.
-
 ```{r}
-# --- Helper: Vectorized metrics calculation ---
-metrics_from_preds <- function(pred, truth) {
-  # Align factor levels safely
+# Multiclass metrics per model (standalone)
+metrics_from_preds_mc <- function(pred, truth) {
   lvls <- union(levels(as.factor(truth)), levels(as.factor(pred)))
   truth <- factor(truth, levels = lvls)
   pred  <- factor(pred, levels = lvls)
-  
-  # Build confusion matrix
+
   tab <- table(Prediction = pred, Reference = truth)
-  
-  # Vectorized extraction
   tp <- diag(tab)
   fp <- rowSums(tab) - tp
   fn <- colSums(tab) - tp
   support <- colSums(tab)
-  
-  # Vectorized metric math 
+
   precision <- tp / (tp + fp)
   recall    <- tp / (tp + fn)
   f1        <- 2 * precision * recall / (precision + recall)
-  
-  # Convert NaNs to NAs
+
   precision[is.nan(precision)] <- NA_real_
   recall[is.nan(recall)]       <- NA_real_
   f1[is.nan(f1)]               <- NA_real_
-  
-  # Build output tables
+
   per_class <- tibble(
     Class     = colnames(tab),
     Support   = as.integer(support),
@@ -1135,50 +1164,90 @@ metrics_from_preds <- function(pred, truth) {
     Recall    = as.numeric(recall),
     F1        = as.numeric(f1)
   )
-  
+
   overall <- tibble(
     Accuracy   = sum(tp) / sum(tab),
     MacroF1    = mean(f1, na.rm = TRUE),
     WeightedF1 = sum(f1 * support, na.rm = TRUE) / sum(support)
   )
-  
+
   list(confusion = tab, overall = overall, per_class = per_class)
 }
 
-test_multi  <- test_data
-truth_multi <- test_multi$paper_BRCA_Subtype_PAM50
+truth_mc <- droplevels(test_data$paper_BRCA_Subtype_PAM50)
 
-models_multi <- list(
-  "k-NN"          = pred_knn,
-  "Random forest" = pred_rf
-  # add "Multinom" only if you actually created pred_multinom
-)
-
-# --- Evaluate Models Iteratively ---
-truth <- test_data$paper_BRCA_Subtype_PAM50
-
-models <- list(
-  "Logistic regression" = pred_logit,
+models_mc <- list(
+  "Multi Log" = pred_multinom,
   "k-NN"                = pred_knn,
-  "Random forest"       = pred_rf
+  "RF forest"       = pred_rf
 )
 
-# 1. Use base R lapply() instead of purrr::map()
-evaluations <- lapply(models, metrics_from_preds, truth = truth)
+eval_mc <- lapply(models_mc, metrics_from_preds_mc, truth = truth_mc)
 
-conf_tbl <- tibble(
-  Model = names(evaluations),
-  Confusion = lapply(evaluations, `[[`, "confusion")
+overall_tbl <- bind_rows(
+  lapply(names(eval_mc), function(name) {
+    eval_mc[[name]]$overall %>% mutate(Model = name)
+  })
 )
 
-# To print a specific model nicely:
-conf_tbl
+per_class_tbl <- bind_rows(
+  lapply(names(eval_mc), function(name) {
+    eval_mc[[name]]$per_class %>% mutate(Model = name)
+  })
+)
+
+overall_tbl
+per_class_tbl
 ```
 
+The comparison of the models shows how the variation of the different PAM50 subtype features affects the model's classification performance.
 
+## Step 8 — Method Comparison
+
+### Compare model performance systematically in a summary table.
+
+```{r}
+# Multiclass performance summary (overall metrics + multiclass AUC)
+model_perf_tbl <- overall_tbl %>%
+  select(Model, Accuracy, MacroF1, WeightedF1) %>%
+  left_join(
+    tibble(
+      Model = c("Multinomial Logistic", "k-NN", "Random Forest"),
+      AUC = c(auc(roc_multinom), auc(roc_knn), auc(roc_rf))
+    ),
+    by = "Model"
+  )
+
+model_perf_tbl
+```
 
 ### Evaluate whether the top DEGs (Step 6) rank highly as predictive features (Step 7 feature importance). Overlap analysis with UpSet plot or Venn diagram.
 
+```{r}
+# Overlap between top DEGs and model feature importance
+deg_set <- unique(top20$gene)
+
+# Use multiclass RF importance if available
+rf_imp <- randomForest::importance(model_rf)
+rf_imp_df <- tibble(
+  gene = rownames(rf_imp),
+  importance = rowMeans(rf_imp, na.rm = TRUE)
+) %>%
+  arrange(desc(importance))
+
+top_rf_genes <- rf_imp_df %>% slice_head(n = 20) %>% pull(gene)
+
+overlap_genes <- intersect(deg_set, top_rf_genes)
+
+overlap_summary <- tibble(
+  DEG_top20_total = length(deg_set),
+  RF_top20_total = length(top_rf_genes),
+  Overlap = length(overlap_genes)
+)
+
+overlap_summary
+overlap_genes
+```
 
 # Part II — Clinical Data Analysis
 
@@ -1424,7 +1493,6 @@ age_corr_tbl <- lapply(stepD_genes, function(gene) {
 age_corr_tbl %>% slice_head(n = 10)
 ```
 
-
 ### Test whether top DEGs differ significantly across clinical stages.
 
 ```{r}
@@ -1511,7 +1579,6 @@ tibble(
 )
 ```
 
-
 ### Visualize: boxplots of top expression features stratified by clinical subgroups; annotated heatmap with both molecular and clinical annotation bars.
 
 ```{r}
@@ -1554,12 +1621,10 @@ pheatmap(
 )
 ```
 
-
 ### 
 
 ## Step E - Discussion & Interpretation
 
-### Critical thinking questions
 
 ### Are the molecular subtypes (from expression clustering) concordant with clinical staging? Where do they disagree?
 
