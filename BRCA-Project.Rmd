@@ -89,7 +89,6 @@ print("Sample count per PAM50 subtype:")
 print(subtype_counts)
 ```
 
-
 ## Step 2 — Expression Distribution Analysis
 
 ## significant breast cancer genes from the paper (genes with the most consistent ):
@@ -920,7 +919,7 @@ that leveraged eucleadian distances for binary classification. Here we
 manually specify the number of neighbors with `tuneGrid` to exclude too
 low or too high k values. We also use a cross validation with 5 samples
 using `trainControl`. The necessary preprocessing was also done to
-calculate the correct distances. 
+calculate the correct distances.
 
 ```{r}
 # Train k-NN
@@ -963,9 +962,10 @@ point.
 #### Random forest
 
 For this section we could have either used `train` with `method="rf"` or
-just used the `randomForest``library, which we did the exercises for in the course. We
-went for the library. Here we also use backward selection with `step` to exclude 
-parameters based on their correlation with each other (high correlation=bad).
+just used the `randomForest` library, which we did the exercises for in
+the course. We went for the library. Here we also use backward selection
+with `step` to exclude parameters based on their correlation with each
+other (high correlation=bad).
 
 ```{r}
 # Fit the random forest model
@@ -1099,7 +1099,10 @@ testing data looks good.\
 
 #### Random Forest:
 
-For the multiclass classification we need to make another dataframe without the binary classification and also again add the expression dataset. We also need a new training index. 
+For the multiclass classification we need to make another dataframe
+without the binary classification and also again add the expression
+dataset. We also need a new training index.
+
 ```{r}
 set.seed(161)
 
@@ -1145,7 +1148,10 @@ test also returns good values, especially at subtypes: Her2 and Basal
 but also LumA.
 
 #### kNN - Multi class:
-here we use the same command but with `multiClassSummary` as `summaryFunction`. 
+
+here we use the same command but with `multiClassSummary` as
+`summaryFunction`.
+
 ```{r}
 
 model_knn <- train(
@@ -1187,7 +1193,11 @@ model_multinom <- train(paper_BRCA_Subtype_PAM50 ~ .,
 pred_multinom <- predict(model_multinom, test_data)
 confusionMatrix(pred_multinom, test_data$paper_BRCA_Subtype_PAM50)
 ```
-For the comparison of the roc curves, we use `droplevels` to take true labels for subseting subtypes and then we use pROC to get the rocs out of predictions. We then use a loop to plot each roc line.
+
+For the comparison of the roc curves, we use `droplevels` to take true
+labels for subseting subtypes and then we use pROC to get the rocs out
+of predictions. We then use a loop to plot each roc line.
+
 ```{r}
 
 truth <- droplevels(test_data$paper_BRCA_Subtype_PAM50)
@@ -1215,8 +1225,11 @@ if (length(roc_list) > 1) {
 }
 legend("bottomright", legend = classes, col = seq_along(classes), lwd = 2)
 ```
-In our case, unlike the binary classification, multi-class ROCs cannot show the summary of the models performance, but rather the performance between subtypes. Here we see that Basal has the best performance and normal has the worst so lets take a look at them more closely:
 
+In our case, unlike the binary classification, multi-class ROCs cannot
+show the summary of the models performance, but rather the performance
+between subtypes. Here we see that Basal has the best performance and
+normal has the worst so lets take a look at them more closely:
 
 For viewing all models' performances, we can subset by subtype:
 
@@ -1253,18 +1266,25 @@ legend("bottomright",
        legend = c("Multinom", "Random Forest", "k-NN"),
        col = c("blue", "green", "red"), lwd = 2)
 ```
-Here we see that all models function somewhat similarly. In the normal ROC curves it can be noticed that the steps and slopes are somewhat different, with k-NN being more smooth than both models and the logit model having either 1 or 0 as its slope. 
+
+Here we see that all models function somewhat similarly. In the normal
+ROC curves it can be noticed that the steps and slopes are somewhat
+different, with k-NN being more smooth than both models and the logit
+model having either 1 or 0 as its slope.
 
 #### AUCs:
 
 for calculating AUCs, `proc` is used again.
+
 ```{r}
 rocs <- c(auc(roc_logit),auc(roc_knn),auc(roc_rf))
 tibble(models=c("Multinom", "k-Nearest Neighbors", "Random Forest"),
        AUC=rocs)
 
 ```
-We see that the kNN and the RF models worked the best, outputting the least false negatives/false positives, as shown by the AUC score. 
+
+We see that the kNN and the RF models worked the best, outputting the
+least false negatives/false positives, as shown by the AUC score.
 
 ```{r}
 
@@ -1348,7 +1368,13 @@ per_class_tbl
 ```
 
 The comparison of the models shows how the variation of the different
-PAM50 subtype features affects the model's classification performance. Overall we see good values for Basal and LumA, with Her2 also returning good values in multinom and RF but not kNN (probably because its datapoints landed near others and there needed to be more datapoints generally). The Normal subtype, again, suffers from the small number of datapoints and lack of noticeable transcriptional difference with the other subtypes.
+PAM50 subtype features affects the model's classification performance.
+Overall we see good values for Basal and LumA, with Her2 also returning
+good values in multinom and RF but not kNN (probably because its
+datapoints landed near others and there needed to be more datapoints
+generally). The Normal subtype, again, suffers from the small number of
+datapoints and lack of noticeable transcriptional difference with the
+other subtypes.
 
 ## Step 8 — Method Comparison
 
@@ -1425,10 +1451,21 @@ venn.plot <- draw.pairwise.venn(
   cat.pos = c(-20, 20)
 )
 ```
-The analysis shows that the two overlapping genes between DEGs and RF are AGR3 and TFF1. These genes also happen to be differentially expressed luminal like breast cancers, marking less aggressive responses when highly expressed (Kvamme, 2026 ; Obacz 2015). Using the expression values of these genes the model could successfully differentiate between these subtypes and the others. Furthermore, this minimal overlap demonstrates that while the DEG pipeline relies strictly on individual gene expression variability, the Random Forest model leverages complex, non-linear interactions among a more diverse ensemble of features to achieve classification.
 
-The fact that only these two genes are selected by the model has to do with the high number of luminal like samples in the dataset. 
-# Part II — Clinical Data Analysis
+The analysis shows that the two overlapping genes between DEGs and RF
+are AGR3 and TFF1. These genes also happen to be differentially
+expressed luminal like breast cancers, marking less aggressive responses
+when highly expressed (Kvamme, 2026 ; Obacz 2015). Using the expression
+values of these genes the model could successfully differentiate between
+these subtypes and the others. Furthermore, this minimal overlap
+demonstrates that while the DEG pipeline relies strictly on individual
+gene expression variability, the Random Forest model leverages complex,
+non-linear interactions among a more diverse ensemble of features to
+achieve classification.
+
+The fact that only these two genes are selected by the model has to do
+with the high number of luminal like samples in the dataset. \# Part II
+— Clinical Data Analysis
 
 ## Step A — Annotation Cleaning
 
@@ -1800,8 +1837,6 @@ pheatmap(
 )
 ```
 
-### 
-
 ## Step E - Discussion & Interpretation
 
 ### Are the molecular subtypes (from expression clustering) concordant with clinical staging? Where do they disagree?
@@ -1811,3 +1846,31 @@ pheatmap(
 ### What biological mechanisms might explain the top DEGs found between clinical subgroups?
 
 ### What are the limitations of the TCGA cohort for clinical prediction (sample size per stage, selection of academic-centre patients, etc.)?
+
+## References:
+
+1.  [The hnRNP family: insights into their role in health and disease -
+    PMC](https://pmc.ncbi.nlm.nih.gov/articles/PMC4947485/)
+
+2.  [Significance, detection and markers of disseminated breast cancer
+    cells - PubMed](https://pubmed.ncbi.nlm.nih.gov/17158753/)
+
+3.  [Expression analysis of mammaglobin A (SCGB2A2) and lipophilin B
+    (SCGB1D2) in more than 300 human tumors and matching normal tissues
+    reveals their co-expression in gynecologic malignancies -
+    PMC](https://pmc.ncbi.nlm.nih.gov/articles/PMC1513245/)
+
+4.  [Comprehensive molecular portraits of human breast tumours \|
+    Nature](https://www.nature.com/articles/nature11412)
+
+5.  [Age-Specific Changes in Intrinsic Breast Cancer Subtypes: A Focus
+    on Older Women -
+    PMC](https://pmc.ncbi.nlm.nih.gov/articles/PMC4200998/)
+
+6.  [Anterior gradient protein 3 is associated with less aggressive
+    tumors and better outcome of breast cancer patients -
+    PMC](https://pmc.ncbi.nlm.nih.gov/articles/PMC4485854/)
+
+7.  [Low tumoral Trefoil Factor 1 expression relates to aggressive tumor
+    features and poor survival in young women with breast cancer -
+    PMC](https://pmc.ncbi.nlm.nih.gov/articles/PMC12891483/)
