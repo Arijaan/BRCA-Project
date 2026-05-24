@@ -1293,7 +1293,6 @@ for calculating AUCs, `proc` is used again.
 rocs <- c(auc(roc_logit),auc(roc_knn),auc(roc_rf))
 tibble(models=c("Multinom", "k-Nearest Neighbors", "Random Forest"),
        AUC=rocs)
-
 ```
 
 We see that the kNN and the RF models worked the best, outputting the
@@ -1906,7 +1905,7 @@ signals from technical variation, ultimately degrading its performance.
 
 ### Visualize: boxplots of top expression features stratified by clinical subgroups; annotated heatmap with both molecular and clinical annotation bars.
 
-```{r}
+```{r fig.height=5, fig.width=10}
 plot_genes <- head(stepD_top_expr, 4)
 
 box_df <- stepD_df %>%
